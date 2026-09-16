@@ -39,22 +39,40 @@ export default function AssessmentPage({ params }: Props) {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("assessments")
-        .select("*, vehicles(*)")
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .single();
+      // Admins can open any customer's assessment. Customers can only open
+      // their own assessment. This is also enforced by the database RLS.
+      const { data: adminResult, error: adminCheckError } = await supabase.rpc("is_admin");
+      if (adminCheckError) throw new Error(`Could not verify administrator access: ${adminCheckError.message}`);
+      const isAdmin = adminResult === true;
 
+      let assessmentQuery = supabase
+        .from("assessments")
+        .select("*")
+        .eq("id", id);
+
+      if (!isAdmin) assessmentQuery = assessmentQuery.eq("user_id", user.id);
+
+      const { data, error } = await assessmentQuery.maybeSingle();
       if (error) throw new Error(`Could not load assessment: ${error.message}`);
+      if (!data) throw new Error("Assessment not found or you do not have permission to view it.");
 
       setA(data);
-      setVehicle(data.vehicles);
 
-      const { data: ps } = await supabase
+      // Load the vehicle separately so this page is reliable for both
+      // customer and admin sessions and does not depend on a nested relation.
+      const { data: vehicleData, error: vehicleError } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("id", data.vehicle_id)
+        .maybeSingle();
+      if (vehicleError) throw new Error(`Could not load vehicle: ${vehicleError.message}`);
+      setVehicle(vehicleData);
+
+      const { data: ps, error: photoError } = await supabase
         .from("assessment_photos")
         .select("*")
         .eq("assessment_id", id);
+      if (photoError) throw new Error(`Could not load assessment photos: ${photoError.message}`);
 
       if (ps) {
         const withUrls = await Promise.all(ps.map(async (p) => {
@@ -142,7 +160,7 @@ export default function AssessmentPage({ params }: Props) {
 
   if (loading) return <main className="section"><div className="container">Loading assessment...</div></main>;
 
-  if (!a) return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/dashboard">Back to dashboard</a></div></main>;
+  if (!a) return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/admin">Back to admin dashboard</a></div></main>;
 
   const damagedParts = toArray<string>(analysis?.damaged_parts);
   const recommendations = toArray<string>(analysis?.recommendations);
@@ -154,7 +172,7 @@ export default function AssessmentPage({ params }: Props) {
       <header className="nav"><div className="container"><div className="brand"><span>Car</span>Fix</div></div></header>
       <section className="section">
         <div className="container">
-          <a href="/dashboard">← Dashboard</a>
+          <a href="/admin">← Admin Dashboard</a>
           <p className="muted" style={{ marginTop: 25 }}>Assessment</p>
           <h1>{vehicle?.make} {vehicle?.model}</h1>
           <p className="muted">{vehicle?.year} · {a.city} · Status: {a.status}</p>
