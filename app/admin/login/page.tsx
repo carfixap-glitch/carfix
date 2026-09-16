@@ -14,19 +14,36 @@ export default function AdminLoginPage() {
     event.preventDefault();
     setError("");
     setLoading(true);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: loginId, password });
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email: loginId.trim(),
+      password,
+    });
+
     if (signInError || !data.user) {
       setError(signInError?.message || "Invalid administrator credentials.");
       setLoading(false);
       return;
     }
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-    if (profileError || profile?.role !== "admin") {
+
+    // Use the protected admin helper rather than a profiles table query.
+    // This avoids an RLS policy dependency during the login check.
+    const { data: isAdmin, error: adminCheckError } = await supabase.rpc("is_admin");
+
+    if (adminCheckError) {
+      await supabase.auth.signOut();
+      setError(`Administrator verification failed: ${adminCheckError.message}`);
+      setLoading(false);
+      return;
+    }
+
+    if (isAdmin !== true) {
       await supabase.auth.signOut();
       setError("This account is not configured as an administrator.");
       setLoading(false);
       return;
     }
+
     window.location.href = "/admin";
   }
 
