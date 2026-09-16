@@ -25,6 +25,7 @@ export default function AssessmentPage({ params }: Props) {
   const [photos, setPhotos] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
   const [estimate, setEstimate] = useState<any>(null);
+  const [garages, setGarages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -82,6 +83,19 @@ export default function AssessmentPage({ params }: Props) {
 
       setAnalysis(da);
       setEstimate(re);
+
+      const city = String(data.city ?? "").trim();
+      if (city) {
+        const { data: nearbyGarages } = await supabase
+          .from("garages")
+          .select("id, name, phone, address, city, services, latitude, longitude")
+          .ilike("city", city)
+          .limit(5);
+        setGarages(nearbyGarages ?? []);
+      } else {
+        setGarages([]);
+      }
+
       setLoading(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load assessment");
@@ -114,12 +128,8 @@ export default function AssessmentPage({ params }: Props) {
         body: { assessment_id: assessmentId },
       });
 
-      if (error) {
-        throw new Error(error.message || "AI analysis request failed");
-      }
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (error) throw new Error(error.message || "AI analysis request failed");
+      if (data?.error) throw new Error(data.error);
 
       await load(assessmentId);
       setMessage("Analysis completed successfully.");
@@ -130,17 +140,14 @@ export default function AssessmentPage({ params }: Props) {
     }
   }
 
-  if (loading) {
-    return <main className="section"><div className="container">Loading assessment...</div></main>;
-  }
+  if (loading) return <main className="section"><div className="container">Loading assessment...</div></main>;
 
-  if (!a) {
-    return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/dashboard">Back to dashboard</a></div></main>;
-  }
+  if (!a) return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/dashboard">Back to dashboard</a></div></main>;
 
   const damagedParts = toArray<string>(analysis?.damaged_parts);
   const recommendations = toArray<string>(analysis?.recommendations);
   const repairOrReplacement = toArray<{ part?: string; action?: string }>(analysis?.repair_or_replacement);
+  const mapQuery = encodeURIComponent(`car repair workshop ${a.city ?? ""}`);
 
   return (
     <main>
@@ -185,6 +192,33 @@ export default function AssessmentPage({ params }: Props) {
               <p><strong>Estimated time:</strong> {estimate.estimated_time_min}–{estimate.estimated_time_max} hours</p>
               <p className="muted" style={{ marginTop: 12 }}>{estimate.notes}</p>
             </div>}
+
+            <div className="card" style={{ marginTop: 20 }}>
+              <h2>Nearby workshop options</h2>
+              <p className="muted">Based on the city selected for this assessment: <strong>{a.city}</strong>.</p>
+              {garages.length > 0 ? (
+                <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+                  {garages.map((garage) => {
+                    const services = toArray<string>(garage.services);
+                    const directions = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(garage.name + ", " + garage.address)}`;
+                    return (
+                      <div key={garage.id} className="card" style={{ padding: 16 }}>
+                        <h3>{garage.name}</h3>
+                        <p style={{ marginTop: 6 }}>{garage.address}</p>
+                        {garage.phone && <p className="muted" style={{ marginTop: 5 }}>Phone: {garage.phone}</p>}
+                        {services.length > 0 && <p className="muted" style={{ marginTop: 5 }}>Services: {services.join(" · ")}</p>}
+                        <a className="btn" href={directions} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>Get directions</a>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="muted" style={{ marginTop: 18 }}>No workshop records are stored for this city yet. Use the map search below to find current nearby options.</p>
+              )}
+              <a className="btn primary" href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`} target="_blank" rel="noreferrer" style={{ marginTop: 18 }}>
+                Find more workshops near {a.city}
+              </a>
+            </div>
           </>}
         </div>
       </section>
