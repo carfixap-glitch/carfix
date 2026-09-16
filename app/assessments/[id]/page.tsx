@@ -5,6 +5,19 @@ import { createClient } from "@/lib/supabase";
 
 type Props = { params: Promise<{ id: string }> };
 
+function toArray<T = any>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed as T[] : [];
+    } catch {
+      return value.trim() ? [value as T] : [];
+    }
+  }
+  return [];
+}
+
 export default function AssessmentPage({ params }: Props) {
   const [assessmentId, setAssessmentId] = useState("");
   const [a, setA] = useState<any>(null);
@@ -18,61 +31,62 @@ export default function AssessmentPage({ params }: Props) {
   const supabase = createClient();
 
   async function load(id: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      window.location.href = "/login";
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
 
-    const { data, error } = await supabase
-      .from("assessments")
-      .select("*, vehicles(*)")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
+      const { data, error } = await supabase
+        .from("assessments")
+        .select("*, vehicles(*)")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
 
-    if (error) {
-      setMessage(`Could not load assessment: ${error.message}`);
-      setLoading(false);
-      return;
-    }
+      if (error) throw new Error(`Could not load assessment: ${error.message}`);
 
-    setA(data);
-    setVehicle(data.vehicles);
+      setA(data);
+      setVehicle(data.vehicles);
 
-    const { data: ps } = await supabase
-      .from("assessment_photos")
-      .select("*")
-      .eq("assessment_id", id);
+      const { data: ps } = await supabase
+        .from("assessment_photos")
+        .select("*")
+        .eq("assessment_id", id);
 
-    if (ps) {
-      const withUrls = await Promise.all(
-        ps.map(async (p) => {
+      if (ps) {
+        const withUrls = await Promise.all(ps.map(async (p) => {
           const { data: u } = await supabase
             .storage
             .from("carfix-damage-photos")
             .createSignedUrl(p.storage_path, 3600);
           return { ...p, url: u?.signedUrl };
-        })
-      );
-      setPhotos(withUrls);
+        }));
+        setPhotos(withUrls);
+      }
+
+      const { data: da, error: daError } = await supabase
+        .from("damage_analysis")
+        .select("*")
+        .eq("assessment_id", id)
+        .maybeSingle();
+      if (daError) throw new Error(`Could not load AI analysis: ${daError.message}`);
+
+      const { data: re, error: reError } = await supabase
+        .from("repair_estimates")
+        .select("*")
+        .eq("assessment_id", id)
+        .maybeSingle();
+      if (reError) throw new Error(`Could not load repair estimate: ${reError.message}`);
+
+      setAnalysis(da);
+      setEstimate(re);
+      setLoading(false);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load assessment");
+      setLoading(false);
     }
-
-    const { data: da } = await supabase
-      .from("damage_analysis")
-      .select("*")
-      .eq("assessment_id", id)
-      .maybeSingle();
-
-    const { data: re } = await supabase
-      .from("repair_estimates")
-      .select("*")
-      .eq("assessment_id", id)
-      .maybeSingle();
-
-    setAnalysis(da);
-    setEstimate(re);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -81,36 +95,39 @@ export default function AssessmentPage({ params }: Props) {
       if (!active) return;
       setAssessmentId(id);
       load(id);
+    }).catch((error) => {
+      if (active) {
+        setMessage(error instanceof Error ? error.message : "Could not open assessment");
+        setLoading(false);
+      }
     });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [params]);
 
   async function runAnalysis() {
-    if (!assessmentId) return;
+    if (!assessmentId || busy) return;
     setBusy(true);
-    setMessage("AI is analyzing the damage photos...");
+    setMessage("AI is analyzing the damage photos. This may take a little while...");
 
-    const { data, error } = await supabase.functions.invoke("analyze-car-damage", {
-      body: { assessment_id: assessmentId },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-car-damage-v2", {
+        body: { assessment_id: assessmentId },
+      });
 
-    if (error) {
-      setMessage(error.message);
+      if (error) {
+        throw new Error(error.message || "AI analysis request failed");
+      }
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      await load(assessmentId);
+      setMessage("Analysis completed successfully.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI analysis failed");
+    } finally {
       setBusy(false);
-      return;
     }
-
-    if (data?.error) {
-      setMessage(data.error);
-      setBusy(false);
-      return;
-    }
-
-    await load(assessmentId);
-    setMessage("Analysis completed.");
-    setBusy(false);
   }
 
   if (loading) {
@@ -118,8 +135,12 @@ export default function AssessmentPage({ params }: Props) {
   }
 
   if (!a) {
-    return <main className="section"><div className="container"><h1>Assessment not found</h1><p className="muted">{message}</p><a href="/dashboard">Back to dashboard</a></div></main>;
+    return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/dashboard">Back to dashboard</a></div></main>;
   }
+
+  const damagedParts = toArray<string>(analysis?.damaged_parts);
+  const recommendations = toArray<string>(analysis?.recommendations);
+  const repairOrReplacement = toArray<{ part?: string; action?: string }>(analysis?.repair_or_replacement);
 
   return (
     <main>
@@ -152,11 +173,11 @@ export default function AssessmentPage({ params }: Props) {
               <p>{analysis.damage_description}</p>
               <p style={{ marginTop: 14 }}><strong>Severity:</strong> {analysis.severity}</p>
               <h3 style={{ marginTop: 18 }}>Damaged parts</h3>
-              <ul>{(analysis.damaged_parts || []).map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
+              <ul>{damagedParts.map((x, i) => <li key={i}>{x}</li>)}</ul>
               <h3 style={{ marginTop: 18 }}>Recommendations</h3>
-              <ul>{(analysis.recommendations || []).map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
+              <ul>{recommendations.map((x, i) => <li key={i}>{x}</li>)}</ul>
               <h3 style={{ marginTop: 18 }}>Repair or replacement</h3>
-              <ul>{(analysis.repair_or_replacement || []).map((x: any, i: number) => <li key={i}><strong>{x.part}</strong>: {x.action}</li>)}</ul>
+              <ul>{repairOrReplacement.map((x, i) => <li key={i}><strong>{x.part || "Part"}</strong>: {x.action || "Review"}</li>)}</ul>
             </div>
             {estimate && <div className="card" style={{ marginTop: 20 }}>
               <h2>Preliminary repair estimate</h2>
