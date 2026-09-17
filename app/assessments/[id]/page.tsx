@@ -26,6 +26,7 @@ export default function AssessmentPage({ params }: Props) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [estimate, setEstimate] = useState<any>(null);
   const [garages, setGarages] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -43,14 +44,15 @@ export default function AssessmentPage({ params }: Props) {
       // their own assessment. This is also enforced by the database RLS.
       const { data: adminResult, error: adminCheckError } = await supabase.rpc("is_admin");
       if (adminCheckError) throw new Error(`Could not verify administrator access: ${adminCheckError.message}`);
-      const isAdmin = adminResult === true;
+      const admin = adminResult === true;
+      setIsAdmin(admin);
 
       let assessmentQuery = supabase
         .from("assessments")
         .select("*")
         .eq("id", id);
 
-      if (!isAdmin) assessmentQuery = assessmentQuery.eq("user_id", user.id);
+      if (!admin) assessmentQuery = assessmentQuery.eq("user_id", user.id);
 
       const { data, error } = await assessmentQuery.maybeSingle();
       if (error) throw new Error(`Could not load assessment: ${error.message}`);
@@ -58,8 +60,6 @@ export default function AssessmentPage({ params }: Props) {
 
       setA(data);
 
-      // Load the vehicle separately so this page is reliable for both
-      // customer and admin sessions and does not depend on a nested relation.
       const { data: vehicleData, error: vehicleError } = await supabase
         .from("vehicles")
         .select("*")
@@ -160,7 +160,17 @@ export default function AssessmentPage({ params }: Props) {
 
   if (loading) return <main className="section"><div className="container">Loading assessment...</div></main>;
 
-  if (!a) return <main className="section"><div className="container"><h1>Assessment could not be loaded</h1><p className="muted">{message}</p><a href="/admin">Back to admin dashboard</a></div></main>;
+  if (!a) return (
+    <main className="section">
+      <div className="container">
+        <h1>Assessment could not be loaded</h1>
+        <p className="muted">{message}</p>
+        <a href={isAdmin ? "/admin" : "/dashboard"}>
+          {isAdmin ? "Back to admin dashboard" : "Back to dashboard"}
+        </a>
+      </div>
+    </main>
+  );
 
   const damagedParts = toArray<string>(analysis?.damaged_parts);
   const recommendations = toArray<string>(analysis?.recommendations);
@@ -172,7 +182,8 @@ export default function AssessmentPage({ params }: Props) {
       <header className="nav"><div className="container"><div className="brand"><span>Car</span>Fix</div></div></header>
       <section className="section">
         <div className="container">
-          <a href="/admin">← Admin Dashboard</a>
+          {isAdmin && <a href="/admin">← Admin Dashboard</a>}
+          {!isAdmin && <a href="/dashboard">← My Dashboard</a>}
           <p className="muted" style={{ marginTop: 25 }}>Assessment</p>
           <h1>{vehicle?.make} {vehicle?.model}</h1>
           <p className="muted">{vehicle?.year} · {a.city} · Status: {a.status}</p>
