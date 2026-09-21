@@ -118,3 +118,5 @@ export default function AdminPage() {
       </div>)}{!visible.length&&<p className="muted" style={{padding:25,textAlign:"center"}}>No matching assessments.</p>}</div></div>
     </div></section>
   </main>;
+  </main>;
+}
