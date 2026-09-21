@@ -103,13 +103,35 @@ export default function AssessmentPage({ params }: Props) {
       setEstimate(re);
 
       const city = String(data.city ?? "").trim();
+      const latitude = Number(data.latitude);
+      const longitude = Number(data.longitude);
       if (city) {
         const { data: nearbyGarages } = await supabase
           .from("garages")
-          .select("id, name, phone, address, city, services, latitude, longitude")
+          .select("id, name, phone, address, city, services, latitude, longitude, workshop_category")
+          .eq("workshop_category", "body_paint")
           .ilike("city", city)
-          .limit(5);
-        setGarages(nearbyGarages ?? []);
+          .limit(10);
+        const ranked = (nearbyGarages ?? []).map((garage: any) => {
+          const glat = Number(garage.latitude);
+          const glon = Number(garage.longitude);
+          let distanceKm: number | null = null;
+          if (Number.isFinite(latitude) && Number.isFinite(longitude) && Number.isFinite(glat) && Number.isFinite(glon)) {
+            const toRad = (v: number) => v * Math.PI / 180;
+            const dLat = toRad(glat - latitude);
+            const dLon = toRad(glon - longitude);
+            const aa = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(latitude)) * Math.cos(toRad(glat)) * Math.sin(dLon / 2) ** 2;
+            distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+          }
+          return { ...garage, distanceKm };
+        }).sort((x: any, y: any) => {
+          if (x.name === "Clean Cars") return -1;
+          if (y.name === "Clean Cars") return 1;
+          if (x.distanceKm == null) return 1;
+          if (y.distanceKm == null) return -1;
+          return x.distanceKm - y.distanceKm;
+        }).slice(0, 5);
+        setGarages(ranked);
       } else {
         setGarages([]);
       }
@@ -217,7 +239,7 @@ export default function AssessmentPage({ params }: Props) {
         {analysis&&<><div className="result-summary-grid"><div className="result-main-card"><div className="home-kicker">DAMAGE SUMMARY</div><h2>{analysis.damage_description}</h2><div className="result-severity"><span>VISIBLE SEVERITY</span><strong>{analysis.severity}</strong></div></div>{estimate&&<div className="result-cost-card"><span>PRELIMINARY REPAIR RANGE</span><strong>₹{Number(estimate.estimated_min_cost).toLocaleString("en-IN")} – ₹{Number(estimate.estimated_max_cost).toLocaleString("en-IN")}</strong><small>Estimated time: {estimate.estimated_time_min}–{estimate.estimated_time_max} hours</small></div>}</div>
         <div className="result-content-grid"><div className="card"><div className="home-kicker">VISIBLE DAMAGE</div><h2>Affected areas</h2><ul className="result-list">{damagedParts.map((x,i)=><li key={i}>{x}</li>)}</ul></div><div className="card"><div className="home-kicker">NEXT STEPS</div><h2>Recommendations</h2><ul className="result-list">{recommendations.map((x,i)=><li key={i}>{x}</li>)}</ul></div></div>
         <div className="card" style={{marginTop:18}}><div className="home-kicker">REPAIR PLAN</div><h2>Repair or replacement</h2><div className="repair-table">{repairOrReplacement.map((x,i)=><div key={i}><strong>{x.part||"Body panel"}</strong><span>{x.action||"Review required"}</span></div>)}</div>{estimate?.notes&&<p className="muted" style={{marginTop:18}}>{estimate.notes}</p>}</div>
-        <div className="card" style={{marginTop:18}}><div className="home-kicker">WORKSHOP OPTIONS</div><h2>Find your next step</h2><p className="muted">Explore nearby body repair workshops{a.city ? " around " + a.city : ""}.</p><a className="btn primary" href={"https://www.google.com/maps/search/?api=1&query="+mapQuery} target="_blank" rel="noreferrer" style={{marginTop:12}}>Find workshops →</a></div></>}
+        <div className="card workshop-results" style={{marginTop:18}}><div className="home-kicker">BODY REPAIR & PAINTING WORKSHOPS</div><h2>Recommended near you</h2><p className="muted">These workshops are selected specifically for visible car body repair, dent work and painting, using your captured GPS location and city.</p>{garages.length > 0 ? <div className="workshop-list">{garages.map((g: any, index: number) => <div className="workshop-item" key={g.id}><div className="workshop-rank">{index + 1}</div><div className="workshop-info"><div className="workshop-title-row"><h3>{g.name}</h3>{g.name === "Clean Cars" && <span className="workshop-recommended">Recommended</span>}</div><p>{g.address || g.city}</p><div className="workshop-services">{toArray<string>(g.services).slice(0, 5).map((service, i) => <span key={i}>{service}</span>)}</div>{g.distanceKm != null && <small>{g.distanceKm < 1 ? Math.round(g.distanceKm * 1000) + " m away" : g.distanceKm.toFixed(1) + " km away"}</small>}</div><div className="workshop-actions">{g.phone && <a className="btn" href={"tel:" + g.phone}>Call</a>}<a className="btn primary" href={"https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(g.latitude && g.longitude ? g.latitude + "," + g.longitude : g.address || g.name)} target="_blank" rel="noreferrer">Directions</a></div></div>)}</div> : <div className="workshop-empty"><strong>No specialist workshop found in your city yet.</strong><span>Use Google Maps to explore body repair and painting workshops nearby.</span><a className="btn primary" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("car body repair painting workshop " + (a.city ?? ""))} target="_blank" rel="noreferrer">Find workshops →</a></div>}</div></>}
         {message&&<p className="muted" style={{marginTop:14}}>{message}</p>}
       </div></section>
     </main>
