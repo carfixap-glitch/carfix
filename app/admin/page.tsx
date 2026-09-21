@@ -20,23 +20,10 @@ type Row = {
   maxCost?: number | null;
 };
 
-type ManualRow = {
-  id: string;
-  customer_id: string;
-  vehicle_id: string | null;
-  damage_description: string | null;
-  estimated_min_cost: number | null;
-  estimated_max_cost: number | null;
-  shop_name: string | null;
-  created_at: string;
-  customer?: { full_name: string | null; phone: string | null; email: string | null } | null;
-  vehicle?: { make: string | null; model: string | null; year: number | null } | null;
-};
-
 export default function AdminPage() {
   const supabase = createClient();
   const [rows, setRows] = useState<Row[]>([]);
-  const [manualRows, setManualRows] = useState<ManualRow[]>([]);
+  const [manualCount, setManualCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("");
@@ -59,10 +46,9 @@ export default function AdminPage() {
         .order("created_at", { ascending: false });
       if (aError) throw new Error(aError.message);
 
-      const { data: manuals, error: mError } = await supabase
+      const { count: manualTotal, error: mError } = await supabase
         .from("manual_assessments")
-        .select("id, customer_id, vehicle_id, damage_description, estimated_min_cost, estimated_max_cost, shop_name, created_at")
-        .order("created_at", { ascending: false });
+        .select("id", { count: "exact", head: true });
       if (mError) throw new Error(mError.message);
 
       const base = assessments ?? [];
@@ -70,23 +56,18 @@ export default function AdminPage() {
       const vehicleIds = [...new Set(base.map((x: any) => x.vehicle_id).filter(Boolean))];
       const ids = base.map((x: any) => x.id);
 
-      const manualBase = manuals ?? [];
-      const manualCustomerIds = [...new Set(manualBase.map((x: any) => x.customer_id).filter(Boolean))];
-      const manualVehicleIds = [...new Set(manualBase.map((x: any) => x.vehicle_id).filter(Boolean))];
-
-      const [{ data: profiles }, { data: vehicles }, { data: analyses }, { data: estimates }, { data: manualProfiles }, { data: manualVehicles }] = await Promise.all([
+      const [{ data: profiles }, { data: vehicles }, { data: analyses }, { data: estimates }] = await Promise.all([
         userIds.length ? supabase.from("profiles").select("id, full_name, phone, email").in("id", userIds) : Promise.resolve({ data: [] as any[] }),
         vehicleIds.length ? supabase.from("vehicles").select("id, make, model, year").in("id", vehicleIds) : Promise.resolve({ data: [] as any[] }),
         ids.length ? supabase.from("damage_analysis").select("assessment_id, severity").in("assessment_id", ids) : Promise.resolve({ data: [] as any[] }),
         ids.length ? supabase.from("repair_estimates").select("assessment_id, estimated_min_cost, estimated_max_cost").in("assessment_id", ids) : Promise.resolve({ data: [] as any[] }),
-        manualCustomerIds.length ? supabase.from("profiles").select("id, full_name, phone, email").in("id", manualCustomerIds) : Promise.resolve({ data: [] as any[] }),
-        manualVehicleIds.length ? supabase.from("vehicles").select("id, make, model, year").in("id", manualVehicleIds) : Promise.resolve({ data: [] as any[] }),
       ]);
 
       const pm = new Map((profiles ?? []).map((x: any) => [x.id, x]));
       const vm = new Map((vehicles ?? []).map((x: any) => [x.id, x]));
       const am = new Map((analyses ?? []).map((x: any) => [x.assessment_id, x]));
       const em = new Map((estimates ?? []).map((x: any) => [x.assessment_id, x]));
+
       setRows(base.map((x: any) => ({
         ...x,
         profile: pm.get(x.user_id) ?? null,
@@ -95,21 +76,20 @@ export default function AdminPage() {
         minCost: em.get(x.id)?.estimated_min_cost ?? null,
         maxCost: em.get(x.id)?.estimated_max_cost ?? null
       })));
-
-      const mpm = new Map((manualProfiles ?? []).map((x: any) => [x.id, x]));
-      const mvm = new Map((manualVehicles ?? []).map((x: any) => [x.id, x]));
-      setManualRows(manualBase.map((x: any) => ({
-        ...x,
-        customer: mpm.get(x.customer_id) ?? null,
-        vehicle: mvm.get(x.vehicle_id) ?? null
-      })));
-
+      setManualCount(manualTotal ?? 0);
       setLoading(false);
     }
-    load().catch((e) => { setError(e instanceof Error ? e.message : "Could not load admin dashboard"); setLoading(false); });
+
+    load().catch((e) => {
+      setError(e instanceof Error ? e.message : "Could not load admin dashboard");
+      setLoading(false);
+    });
   }, []);
 
-  async function logout() { await supabase.auth.signOut(); window.location.href = "/"; }
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
 
   async function updateStatus(id: string, status: string) {
     const { error } = await supabase.from("assessments").update({ status }).eq("id", id);
@@ -141,19 +121,15 @@ export default function AdminPage() {
 
       {error && <div className="card" style={{marginTop:20}}><p>{error}</p></div>}
 
-      <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)",marginTop:24}}>
+      <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginTop:24}}>
         <div className="card"><p className="muted">Total assessments</p><h2>{rows.length}</h2></div>
         <div className="card"><p className="muted">Completed</p><h2>{completed}</h2></div>
         <div className="card"><p className="muted">Pending / processing</p><h2>{pending}</h2></div>
-      </div>
-
-      <div className="card" style={{marginTop:24}}>
-        <h2>📝 Manual assessments</h2>
-        <p className="muted">Overall view of manual assessments created for customers.</p>
-        <div style={{display:"grid",gap:12,marginTop:18}}>
-          {manualRows.map((r) => <div key={r.id} className="card" style={{padding:16}}><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><strong>{r.customer?.full_name || "Customer"}</strong><span className="muted">{new Date(r.created_at).toLocaleString("en-IN")}</span></div><p style={{marginTop:6}}><strong>Phone:</strong> {r.customer?.phone || "No phone"}</p><p style={{marginTop:4}}><strong>Vehicle:</strong> {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""}</p>{r.damage_description&&<p style={{marginTop:4}}><strong>Damage:</strong> {r.damage_description}</p>}{(r.estimated_min_cost!=null||r.estimated_max_cost!=null)&&<p style={{marginTop:4}}><strong>Cost:</strong> ₹{r.estimated_min_cost!=null?Number(r.estimated_min_cost).toLocaleString("en-IN"):"—"} – ₹{r.estimated_max_cost!=null?Number(r.estimated_max_cost).toLocaleString("en-IN"):"—"}</p>}{r.shop_name&&<p style={{marginTop:4}}><strong>Shop:</strong> {r.shop_name}</p>}<a className="btn primary" style={{marginTop:10}} href={`/admin/customers/${r.customer_id}/manual-assessment/${r.id}`}>View / PDF</a></div>)}
-          {!manualRows.length&&<p className="muted">No manual assessments yet.</p>}
-        </div>
+        <a className="card" href="/admin/manual-assessments" style={{textDecoration:"none",color:"inherit"}}>
+          <p className="muted">📝 Manual assessments</p>
+          <h2>{manualCount}</h2>
+          <p className="muted" style={{marginTop:6}}>Click to view all →</p>
+        </a>
       </div>
 
       <div className="card" style={{marginTop:24}}>
