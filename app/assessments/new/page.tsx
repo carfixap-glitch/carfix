@@ -11,7 +11,8 @@ export default function NewAssessmentPage() {
   const [make,setMake]=useState("");
   const [model,setModel]=useState("");
   const [locationStatus,setLocationStatus]=useState("Getting your current location…");
-  const [coords,setCoords]=useState<{latitude:number;longitude:number}|null>(null);
+  const [coords,setCoords]=useState<{latitude:number;longitude:number;accuracy:number}|null>(null);
+  const [locationDetails,setLocationDetails]=useState<{address:string;city:string;state:string;pincode:string;country:string}>({address:"",city:"",state:"",pincode:"",country:""});
   const [photos,setPhotos]=useState<File[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -32,9 +33,23 @@ export default function NewAssessmentPage() {
     setLocationStatus("Getting your current GPS location…");
     navigator.geolocation.getCurrentPosition(
       position=>{
-        const next={latitude:position.coords.latitude,longitude:position.coords.longitude};
+        const next={latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy};
         setCoords(next);
-        setLocationStatus("Current GPS location captured.");
+        setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Looking up address…`);
+        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${next.latitude}&longitude=${next.longitude}&localityLanguage=en`)
+          .then(response=>response.ok ? response.json() : Promise.reject(new Error("Reverse geocoding failed")))
+          .then(data=>{
+            const details={
+              address:data.locality || data.localityInfo?.informative?.[0]?.name || "",
+              city:data.city || data.locality || "",
+              state:data.principalSubdivision || "",
+              pincode:data.postcode || "",
+              country:data.countryName || ""
+            };
+            setLocationDetails(details);
+            setLocationStatus(`Location captured${details.city ? ` — ${details.city}` : ""} (accuracy ~${Math.round(next.accuracy)} m).`);
+          })
+          .catch(()=>setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Address lookup unavailable.`));
       },
       error=>{
         setCoords(null);
@@ -66,7 +81,7 @@ export default function NewAssessmentPage() {
     if(ve){setBusy(false);setMessage(ve.message);return;}
 
     const {data:assessment,error:ae}=await supabase.from("assessments")
-      .insert({user_id:user.id,vehicle_id:vehicle.id,city:null,latitude:coords.latitude,longitude:coords.longitude,status:"pending"})
+      .insert({user_id:user.id,vehicle_id:vehicle.id,city:locationDetails.city || null,latitude:coords.latitude,longitude:coords.longitude,gps_accuracy:coords.accuracy,location_captured_at:new Date().toISOString(),address:locationDetails.address || null,state:locationDetails.state || null,pincode:locationDetails.pincode || null,country:locationDetails.country || null,status:"pending"})
       .select("id").single();
 
     if(ae){setBusy(false);setMessage(ae.message);return;}
@@ -110,6 +125,8 @@ export default function NewAssessmentPage() {
           <div style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}>
             <strong>📍 Current location</strong>
             <p className="muted" style={{margin:"6px 0"}}>{locationStatus}</p>
+            {coords && locationDetails.address && <p style={{margin:"6px 0"}}>{locationDetails.address}{locationDetails.city ? `, ${locationDetails.city}` : ""}{locationDetails.state ? `, ${locationDetails.state}` : ""}{locationDetails.pincode ? ` - ${locationDetails.pincode}` : ""}</p>}
+            {coords && <small className="muted">GPS: {coords.latitude.toFixed(6)}, {coords.longitude.toFixed(6)} · Accuracy: ~{Math.round(coords.accuracy)} m</small>}
             {!coords && <button type="button" className="btn" onClick={getCurrentLocation}>Get my location</button>}
           </div>
 
