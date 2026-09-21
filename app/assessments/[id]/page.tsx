@@ -30,6 +30,7 @@ export default function AssessmentPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const supabase = createClient();
 
   async function load(id: string) {
@@ -60,6 +61,8 @@ export default function AssessmentPage({ params }: Props) {
 
       setA(data);
 
+      const canViewFullAssessment = admin || !data.payment_required || data.payment_status === "free" || data.payment_status === "paid";
+
       const { data: vehicleData, error: vehicleError } = await supabase
         .from("vehicles")
         .select("*")
@@ -85,22 +88,27 @@ export default function AssessmentPage({ params }: Props) {
         setPhotos(withUrls);
       }
 
-      const { data: da, error: daError } = await supabase
-        .from("damage_analysis")
-        .select("*")
-        .eq("assessment_id", id)
-        .maybeSingle();
-      if (daError) throw new Error(`Could not load AI analysis: ${daError.message}`);
+      if (canViewFullAssessment) {
+        const { data: da, error: daError } = await supabase
+          .from("damage_analysis")
+          .select("*")
+          .eq("assessment_id", id)
+          .maybeSingle();
+        if (daError) throw new Error(`Could not load AI analysis: ${daError.message}`);
 
-      const { data: re, error: reError } = await supabase
-        .from("repair_estimates")
-        .select("*")
-        .eq("assessment_id", id)
-        .maybeSingle();
-      if (reError) throw new Error(`Could not load repair estimate: ${reError.message}`);
+        const { data: re, error: reError } = await supabase
+          .from("repair_estimates")
+          .select("*")
+          .eq("assessment_id", id)
+          .maybeSingle();
+        if (reError) throw new Error(`Could not load repair estimate: ${reError.message}`);
 
-      setAnalysis(da);
-      setEstimate(re);
+        setAnalysis(da);
+        setEstimate(re);
+      } else {
+        setAnalysis(null);
+        setEstimate(null);
+      }
 
       const city = String(data.city ?? "").trim();
       const latitude = Number(data.latitude);
@@ -157,6 +165,55 @@ export default function AssessmentPage({ params }: Props) {
     });
     return () => { active = false; };
   }, [params]);
+
+  async function startPayment() {
+    if (!assessmentId || paymentBusy) return;
+    setPaymentBusy(true);
+    setMessage("Preparing secure payment…");
+    try {
+      const { data, error } = await supabase.functions.invoke("create-razorpay-order", { body: { assessment_id: assessmentId } });
+      if (error) throw new Error(error.message || "Could not create payment order");
+      if (data?.error) throw new Error(data.error);
+      if (!data?.order_id) { await load(assessmentId); return; }
+
+      const scriptId = "razorpay-checkout-script";
+      if (!document.getElementById(scriptId)) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.id = scriptId;
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Could not load Razorpay checkout"));
+          document.body.appendChild(script);
+        });
+      }
+      const Razorpay = (window as any).Razorpay;
+      if (!Razorpay) throw new Error("Razorpay checkout is unavailable");
+      const checkout = new Razorpay({
+        key: data.key_id, amount: data.amount, currency: data.currency, name: "CarFix",
+        description: "CarFix damage assessment", order_id: data.order_id, theme: { color: "#111111" },
+        handler: async (response: any) => {
+          try {
+            setMessage("Verifying your payment securely…");
+            const { data: verified, error: verifyError } = await supabase.functions.invoke("verify-razorpay-payment", {
+              body: { assessment_id: assessmentId, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature },
+            });
+            if (verifyError) throw new Error(verifyError.message || "Payment verification failed");
+            if (verified?.error) throw new Error(verified.error);
+            await load(assessmentId);
+            setMessage("Payment successful. Your full assessment is now unlocked.");
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Payment verification failed");
+          } finally { setPaymentBusy(false); }
+        },
+        modal: { ondismiss: () => setPaymentBusy(false) },
+      });
+      checkout.open();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not start payment");
+      setPaymentBusy(false);
+    }
+  }
 
   async function runAnalysis() {
     if (!assessmentId || busy) return;
@@ -235,7 +292,7 @@ export default function AssessmentPage({ params }: Props) {
       <section className="section"><div className="container">
         <div className="result-top"><div><div className="home-kicker">CARFIX AI REPORT</div><h1>{vehicle?.make} {vehicle?.model}</h1><p className="muted">{a.city||"Location captured"} · {new Date(a.created_at).toLocaleDateString("en-IN")} · <span className="home-pill">{a.status}</span></p></div><div className="result-scope">BODY REPAIR<br/><b>& PAINTING ONLY</b></div></div>
         <div className="result-photo-strip">{photos.slice(0,4).map((p)=><div key={p.id}>{p.url&&<img src={p.url} alt="Car damage"/>}</div>)}</div>
-        {!analysis&&<div className="result-empty card"><div className="result-empty-icon">✦</div><h2>Your AI report is ready to generate.</h2><p className="muted">CarFix will inspect the visible exterior damage in your uploaded photos and prepare a preliminary repair estimate.</p><button className="home-primary-btn" onClick={runAnalysis} disabled={busy}>{busy?"Analyzing your car…":"Analyze with CarFix AI →"}</button></div>}
+        {a.payment_required && a.payment_status !== "paid" && !isAdmin ? <div className="result-empty card"><div className="result-empty-icon">₹</div><div className="home-kicker">ASSESSMENT PAYMENT</div><h2>Unlock your CarFix assessment</h2><p className="muted">Your first assessment is free. This assessment is ₹{Number(a.payment_amount || 199).toLocaleString("en-IN")} and includes the full AI damage report, repair estimate and workshop recommendations.</p><button className="home-primary-btn" onClick={startPayment} disabled={paymentBusy}>{paymentBusy ? "Preparing payment…" : "Pay ₹199 & unlock report →"}</button><small className="muted" style={{display:"block",marginTop:12}}>Secure checkout powered by Razorpay.</small></div> : !analysis ? <div className="result-empty card"><div className="result-empty-icon">✦</div><h2>Your AI report is ready to generate.</h2><p className="muted">CarFix will inspect the visible exterior damage in your uploaded photos and prepare a preliminary repair estimate.</p><button className="home-primary-btn" onClick={runAnalysis} disabled={busy}>{busy?"Analyzing your car…":"Analyze with CarFix AI →"}</button></div> : null}
         {analysis&&<><div className="result-summary-grid"><div className="result-main-card"><div className="home-kicker">DAMAGE SUMMARY</div><h2>{analysis.damage_description}</h2><div className="result-severity"><span>VISIBLE SEVERITY</span><strong>{analysis.severity}</strong></div></div>{estimate&&<div className="result-cost-card"><span>PRELIMINARY REPAIR RANGE</span><strong>₹{Number(estimate.estimated_min_cost).toLocaleString("en-IN")} – ₹{Number(estimate.estimated_max_cost).toLocaleString("en-IN")}</strong><small>Estimated time: {estimate.estimated_time_min}–{estimate.estimated_time_max} hours</small></div>}</div>
         <div className="result-content-grid"><div className="card"><div className="home-kicker">VISIBLE DAMAGE</div><h2>Affected areas</h2><ul className="result-list">{damagedParts.map((x,i)=><li key={i}>{x}</li>)}</ul></div><div className="card"><div className="home-kicker">NEXT STEPS</div><h2>Recommendations</h2><ul className="result-list">{recommendations.map((x,i)=><li key={i}>{x}</li>)}</ul></div></div>
         <div className="card" style={{marginTop:18}}><div className="home-kicker">REPAIR PLAN</div><h2>Repair or replacement</h2><div className="repair-table">{repairOrReplacement.map((x,i)=><div key={i}><strong>{x.part||"Body panel"}</strong><span>{x.action||"Review required"}</span></div>)}</div>{estimate?.notes&&<p className="muted" style={{marginTop:18}}>{estimate.notes}</p>}</div>
