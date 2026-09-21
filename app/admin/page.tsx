@@ -137,7 +137,7 @@ export default function AdminPage() {
     <section className="section"><div className="container">
       <p className="muted">Administration</p>
       <h1>CarFix Admin Dashboard</h1>
-      <p className="muted">Manage customers and their vehicle assessments.</p>
+      <p className="muted">Manage customers and their vehicle assessments. Create manual assessments directly for each customer from Assessment management.</p>
 
       {error && <div className="card" style={{marginTop:20}}><p>{error}</p></div>}
 
@@ -145,28 +145,6 @@ export default function AdminPage() {
         <div className="card"><p className="muted">Total assessments</p><h2>{rows.length}</h2></div>
         <div className="card"><p className="muted">Completed</p><h2>{completed}</h2></div>
         <div className="card"><p className="muted">Pending / processing</p><h2>{pending}</h2></div>
-      </div>
-
-      <div className="card" style={{marginTop:24}}>
-        <h2>📝 Manual assessments</h2>
-        <p className="muted">Assessments created manually by an admin for a customer.</p>
-        <div style={{display:"grid",gap:12,marginTop:18}}>
-          {manualRows.map((r) => (
-            <div key={r.id} className="card" style={{padding:16}}>
-              <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-                <strong>{r.customer?.full_name || "Customer"}</strong>
-                <span className="muted">{new Date(r.created_at).toLocaleString("en-IN")}</span>
-              </div>
-              <p style={{marginTop:6}}><strong>Phone:</strong> {r.customer?.phone || "No phone"}</p>
-              <p style={{marginTop:4}}><strong>Vehicle:</strong> {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""}{r.vehicle?.year ? ` (${r.vehicle.year})` : ""}</p>
-              {r.damage_description && <p style={{marginTop:4}}><strong>Damage:</strong> {r.damage_description}</p>}
-              {(r.estimated_min_cost != null || r.estimated_max_cost != null) && <p style={{marginTop:4}}><strong>Cost:</strong> ₹{r.estimated_min_cost != null ? Number(r.estimated_min_cost).toLocaleString("en-IN") : "—"} – ₹{r.estimated_max_cost != null ? Number(r.estimated_max_cost).toLocaleString("en-IN") : "—"}</p>}
-              {r.shop_name && <p style={{marginTop:4}}><strong>Shop:</strong> {r.shop_name}</p>}
-              <a className="btn primary" style={{marginTop:10}} href={`/admin/customers/${r.customer_id}/manual-assessment/${r.id}`}>View / PDF</a>
-            </div>
-          ))}
-          {!manualRows.length && <p className="muted">No manual assessments yet.</p>}
-        </div>
       </div>
 
       <div className="card" style={{marginTop:24}}>
@@ -185,7 +163,7 @@ export default function AdminPage() {
             </div>
             {r.severity && <p style={{marginTop:6}}><strong>AI severity:</strong> {r.severity}</p>}
             {r.minCost != null && r.maxCost != null && <p><strong>Estimate:</strong> ₹{Number(r.minCost).toLocaleString("en-IN")} – ₹{Number(r.maxCost).toLocaleString("en-IN")}</p>}
-            <div style={{display:"flex",gap:10,alignItems:"center",marginTop:10,flexWrap:"wrap"}}><select value={r.status || "pending"} onChange={(e)=>updateStatus(r.id,e.target.value)}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><a className="btn primary" href={`/assessments/${r.id}`}>View assessment</a></div>
+            <div style={{display:"flex",gap:10,alignItems:"center",marginTop:10,flexWrap:"wrap"}}><select value={r.status || "pending"} onChange={(e)=>updateStatus(r.id,e.target.value)}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><a className="btn primary" href={`/assessments/${r.id}`}>View assessment</a><a className="btn" href={`/admin/customers/${r.user_id}/manual-assessment`}>📝 Manual Assessment</a></div>
           </div>)}
           {!visible.length && <p className="muted">No matching assessments.</p>}
         </div>
