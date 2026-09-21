@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase";
 type Row = {
   id: string;
   city: string | null;
+  address: string | null;
+  state: string | null;
+  pincode: string | null;
+  country: string | null;
   status: string | null;
   created_at: string;
   user_id: string;
@@ -37,7 +41,7 @@ export default function AdminPage() {
 
       const { data: assessments, error: aError } = await supabase
         .from("assessments")
-        .select("id, user_id, vehicle_id, city, status, created_at")
+        .select("id, user_id, vehicle_id, city, address, state, pincode, country, status, created_at")
         .order("created_at", { ascending: false });
       if (aError) throw new Error(aError.message);
 
@@ -96,7 +100,11 @@ export default function AdminPage() {
         <div style={{display:"grid",gap:12,marginTop:18}}>{visible.map((r)=><div key={r.id} className="card" style={{padding:16}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><strong>{r.profile?.full_name || "Customer"}</strong><span className="muted">{new Date(r.created_at).toLocaleString("en-IN")}</span></div>
           <p style={{marginTop:6}}><strong>Email:</strong> {r.profile?.email || "No email"}</p>
-          <p style={{marginTop:4}}><strong>Phone:</strong> {r.profile?.phone || "No phone"} · {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""} {r.vehicle?.year ? `(${r.vehicle.year})` : ""} · {r.city || "No city"}</p>
+          <p style={{marginTop:4}}><strong>Phone:</strong> {r.profile?.phone || "No phone"} · {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""} {r.vehicle?.year ? `(${r.vehicle.year})` : ""}</p>
+          <div style={{marginTop:8,padding:10,borderRadius:8,background:"#f8fafc"}}>
+            <strong>📍 Customer location</strong>
+            <p className="muted" style={{marginTop:4}}>{[r.address,r.city,r.state].filter(Boolean).join(", ")}{r.pincode ? ` - ${r.pincode}` : ""}{r.country ? `, ${r.country}` : ""}</p>
+          </div>
           {r.severity && <p style={{marginTop:6}}><strong>AI severity:</strong> {r.severity}</p>}
           {r.minCost != null && r.maxCost != null && <p><strong>Estimate:</strong> ₹{Number(r.minCost).toLocaleString("en-IN")} – ₹{Number(r.maxCost).toLocaleString("en-IN")}</p>}
           <div style={{display:"flex",gap:10,alignItems:"center",marginTop:10,flexWrap:"wrap"}}><select value={r.status || "pending"} onChange={(e)=>updateStatus(r.id,e.target.value)}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><a className="btn primary" href={`/assessments/${r.id}`}>View assessment</a></div>
