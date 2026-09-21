@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 
-type Assessment={id:string;city:string|null;status:string|null;created_at:string;vehicle:{make:string|null;model:string|null;year:number|null}|null;severity?:string|null;minCost?:number|null;maxCost?:number|null};
+type Assessment={id:string;city:string|null;status:string|null;created_at:string;payment_required?:boolean;payment_status?:string;payment_amount?:number;vehicle:{make:string|null;model:string|null;year:number|null}|null;severity?:string|null;minCost?:number|null;maxCost?:number|null};
 
 export default function DashboardPage(){
  const [email,setEmail]=useState(""),[assessments,setAssessments]=useState<Assessment[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const supabase=createClient();
  useEffect(()=>{(async()=>{try{
   const {data:{user}}=await supabase.auth.getUser(); if(!user){window.location.href="/login";return} setEmail(user.email??"");
-  const {data:rows,error:ae}=await supabase.from("assessments").select("id,vehicle_id,city,status,created_at").eq("user_id",user.id).order("created_at",{ascending:false}); if(ae)throw new Error(ae.message);
+  const {data:rows,error:ae}=await supabase.from("assessments").select("id,vehicle_id,city,status,created_at,payment_required,payment_status,payment_amount").eq("user_id",user.id).order("created_at",{ascending:false}); if(ae)throw new Error(ae.message);
   const base=rows??[]; if(!base.length){setLoading(false);return}
   const vids=[...new Set(base.map((x:any)=>x.vehicle_id).filter(Boolean))],ids=base.map((x:any)=>x.id);
   const [{data:vehicles},{data:analyses},{data:estimates}]=await Promise.all([
@@ -19,7 +19,7 @@ export default function DashboardPage(){
    supabase.from("repair_estimates").select("assessment_id,estimated_min_cost,estimated_max_cost").in("assessment_id",ids)
   ]);
   const vm=new Map((vehicles??[]).map((v:any)=>[v.id,v])),am=new Map((analyses??[]).map((a:any)=>[a.assessment_id,a])),em=new Map((estimates??[]).map((e:any)=>[e.assessment_id,e]));
-  setAssessments(base.map((a:any)=>({id:a.id,city:a.city,status:a.status,created_at:a.created_at,vehicle:vm.get(a.vehicle_id)??null,severity:am.get(a.id)?.severity??null,minCost:em.get(a.id)?.estimated_min_cost??null,maxCost:em.get(a.id)?.estimated_max_cost??null}))); setLoading(false);
+  setAssessments(base.map((a:any)=>({id:a.id,city:a.city,status:a.status,created_at:a.created_at,payment_required:a.payment_required,payment_status:a.payment_status,payment_amount:a.payment_amount,vehicle:vm.get(a.vehicle_id)??null,severity:am.get(a.id)?.severity??null,minCost:em.get(a.id)?.estimated_min_cost??null,maxCost:em.get(a.id)?.estimated_max_cost??null}))); setLoading(false);
  }catch(e){setError(e instanceof Error?e.message:"Could not load dashboard");setLoading(false)}})()},[]);
  async function logout(){await supabase.auth.signOut();window.location.href="/"}
  if(loading)return <main className="section"><div className="container">Loading your CarFix workspace…</div></main>;
@@ -35,8 +35,8 @@ export default function DashboardPage(){
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",marginTop:55,gap:20}}><div><div className="home-kicker">ASSESSMENT HISTORY</div><h2 style={{fontSize:32,letterSpacing:-1.5,margin:"9px 0 0"}}>Your recent assessments</h2></div><a className="btn primary" href="/assessments/new">+ New assessment</a></div>
    {!assessments.length?<div className="card" style={{marginTop:20,textAlign:"center",padding:55}}><div style={{fontSize:38}}>🚗</div><h3>No assessments yet</h3><p className="muted">Upload your first damage photos and let CarFix inspect the visible body damage.</p><a className="btn primary" href="/assessments/new" style={{marginTop:14}}>Create your first assessment</a></div>:
    <div style={{display:"grid",gap:14,marginTop:20}}>{assessments.map(item=><a key={item.id} href={`/assessments/${item.id}`} className="assessment-card" style={{textDecoration:"none",color:"inherit",display:"grid",gridTemplateColumns:"1fr auto",gap:20}}>
-    <div><div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{margin:0}}>{item.vehicle?.make??"Vehicle"} {item.vehicle?.model??""}</h3><span className="home-pill">{item.status??"pending"}</span></div><p className="muted" style={{margin:"8px 0"}}>{item.city||"Location captured"} · {new Date(item.created_at).toLocaleDateString("en-IN")}</p>{item.severity&&<p style={{margin:"8px 0"}}><strong>AI severity:</strong> {item.severity}</p>}</div>
-    <div style={{textAlign:"right",minWidth:170}}>{item.minCost!=null&&item.maxCost!=null?<><small className="muted">ESTIMATED REPAIR</small><strong style={{display:"block",fontSize:16,marginTop:5}}>₹{Number(item.minCost).toLocaleString("en-IN")} – ₹{Number(item.maxCost).toLocaleString("en-IN")}</strong></>:<span className="muted">View assessment →</span>}</div>
+    <div><div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{margin:0}}>{item.vehicle?.make??"Vehicle"} {item.vehicle?.model??""}</h3><span className="home-pill">{item.payment_required && item.payment_status !== "paid" ? "Payment required" : item.status??"pending"}</span></div><p className="muted" style={{margin:"8px 0"}}>{item.city||"Location captured"} · {new Date(item.created_at).toLocaleDateString("en-IN")}</p>{item.severity&&<p style={{margin:"8px 0"}}><strong>AI severity:</strong> {item.severity}</p>}</div>
+    <div style={{textAlign:"right",minWidth:170}}>{item.minCost!=null&&item.maxCost!=null?<><small className="muted">ESTIMATED REPAIR</small><strong style={{display:"block",fontSize:16,marginTop:5}}>₹{Number(item.minCost).toLocaleString("en-IN")} – ₹{Number(item.maxCost).toLocaleString("en-IN")}</strong></>:<span className="muted">{item.payment_required && item.payment_status !== "paid" ? `₹${Number(item.payment_amount || 199).toLocaleString("en-IN")} · Pay now →` : "View assessment →"}</span>}</div>
    </a>)}</div>}
   </div></section>
  </main>
