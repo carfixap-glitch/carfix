@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 
 type Customer={id:string;full_name:string|null;phone:string|null;email:string|null;created_at:string};
 type Vehicle={id:string;make:string|null;model:string|null;year:number|null;registration_number:string|null};
-type Assessment={id:string;city:string|null;address:string|null;state:string|null;pincode:string|null;country:string|null;status:string|null;created_at:string;vehicle_id:string|null};
+type Assessment={id:string;city:string|null;address:string|null;state:string|null;pincode:string|null;country:string|null;status:string|null;created_at:string;vehicle_id:string|null;payment_required?:boolean;payment_status?:string;payment_amount?:number};
 type Manual={id:string;damage_description:string|null;estimated_min_cost:number|null;estimated_max_cost:number|null;shop_name:string|null;created_at:string};
 
 export default function CustomerDetailPage(){
@@ -30,7 +30,7 @@ export default function CustomerDetailPage(){
     const [{data:c,error:ce},{data:v,error:ve},{data:a,error:ae},{data:m,error:me}]=await Promise.all([
       supabase.from("profiles").select("id,full_name,phone,email,created_at").eq("id",customerId).eq("role","customer").single(),
       supabase.from("vehicles").select("id,make,model,year,registration_number").eq("user_id",customerId).order("created_at",{ascending:false}),
-      supabase.from("assessments").select("id,city,address,state,pincode,country,status,created_at,vehicle_id").eq("user_id",customerId).order("created_at",{ascending:false}),
+      supabase.from("assessments").select("id,city,address,state,pincode,country,status,created_at,vehicle_id,payment_required,payment_status,payment_amount").eq("user_id",customerId).order("created_at",{ascending:false}),
       supabase.from("manual_assessments").select("id,damage_description,estimated_min_cost,estimated_max_cost,shop_name,created_at").eq("customer_id",customerId).order("created_at",{ascending:false})
     ]);
 
@@ -91,7 +91,7 @@ export default function CustomerDetailPage(){
             <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
               <strong>{vehicleName(a.vehicle_id)}</strong><span className="muted">{new Date(a.created_at).toLocaleString("en-IN")}</span>
             </div>
-            <p style={{marginTop:7}}><strong>Status:</strong> {a.status||"—"}</p>
+            <p style={{marginTop:7}}><strong>Status:</strong> {a.status||"—"}</p><p style={{marginTop:5}}><strong>Payment:</strong> {a.payment_required ? (a.payment_status==="paid" ? `Paid · ₹${Number(a.payment_amount||199).toLocaleString("en-IN")}` : `Pending · ₹${Number(a.payment_amount||199).toLocaleString("en-IN")}`) : "Free"}</p>
             <p style={{marginTop:5}}><strong>Location:</strong> {[a.address,a.city,a.state,a.pincode,a.country].filter(Boolean).join(", ")||"Location not available"}</p>
             <a className="btn" style={{marginTop:10}} href={"/assessments/"+a.id}>View Assessment →</a>
           </div>)}
