@@ -124,5 +124,5 @@ export default function NewAssessmentPage() {
         <aside className="assessment-side"><div className="card side-card"><div className="home-kicker">WHAT YOU'LL GET</div><h3>One clear report.</h3><ul><li><b>AI damage summary</b><span>Visible body damage identified from your photos.</span></li><li><b>Repair guidance</b><span>Repair, repaint, blend or replacement recommendations.</span></li><li><b>Cost range</b><span>Preliminary Indian-market body repair estimate.</span></li><li><b>Repair time</b><span>Estimated workshop time for the visible work.</span></li></ul><button className="home-primary-btn" disabled={busy} type="submit" style={{width:"100%",border:0,marginTop:12}}>{busy?"Creating assessment…":"Create assessment →"}</button><small className="muted" style={{display:"block",textAlign:"center",marginTop:12}}>Your photos stay securely in CarFix.</small></div></aside>
       </form>
     </div></section>
-  </main>  </main>;
+  </main>;
 }
