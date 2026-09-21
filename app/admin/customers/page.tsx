@@ -128,7 +128,7 @@ export default function AdminCustomersPage() {
                   </div>
                   <p style={{marginTop:8}}><strong>Phone:</strong> {customer.phone || "No phone"}</p>
                   <p style={{marginTop:4}}><strong>Email:</strong> {customer.email || "No email"}</p>
-                  <p style={{marginTop:4}}><strong>Assessments:</strong> {customer.assessmentCount}</p>
+                  <p style={{marginTop:4}}><strong>Assessments:</strong> {customer.assessmentCount}</p><a className="btn primary" href={`/admin/customers/${customer.id}/manual-assessment`} style={{marginTop:12}}>➕ Manual Assessment</a>
                 </div>
               ))}
               {!visible.length && <p className="muted">No matching customers.</p>}
