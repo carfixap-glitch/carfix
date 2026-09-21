@@ -148,6 +148,15 @@ export default function AdminPage() {
       </div>
 
       <div className="card" style={{marginTop:24}}>
+        <h2>📝 Manual assessments</h2>
+        <p className="muted">Overall view of manual assessments created for customers.</p>
+        <div style={{display:"grid",gap:12,marginTop:18}}>
+          {manualRows.map((r) => <div key={r.id} className="card" style={{padding:16}}><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><strong>{r.customer?.full_name || "Customer"}</strong><span className="muted">{new Date(r.created_at).toLocaleString("en-IN")}</span></div><p style={{marginTop:6}}><strong>Phone:</strong> {r.customer?.phone || "No phone"}</p><p style={{marginTop:4}}><strong>Vehicle:</strong> {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""}</p>{r.damage_description&&<p style={{marginTop:4}}><strong>Damage:</strong> {r.damage_description}</p>}{(r.estimated_min_cost!=null||r.estimated_max_cost!=null)&&<p style={{marginTop:4}}><strong>Cost:</strong> ₹{r.estimated_min_cost!=null?Number(r.estimated_min_cost).toLocaleString("en-IN"):"—"} – ₹{r.estimated_max_cost!=null?Number(r.estimated_max_cost).toLocaleString("en-IN"):"—"}</p>}{r.shop_name&&<p style={{marginTop:4}}><strong>Shop:</strong> {r.shop_name}</p>}<a className="btn primary" style={{marginTop:10}} href={`/admin/customers/${r.customer_id}/manual-assessment/${r.id}`}>View / PDF</a></div>)}
+          {!manualRows.length&&<p className="muted">No manual assessments yet.</p>}
+        </div>
+      </div>
+
+      <div className="card" style={{marginTop:24}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
           <h2>Assessment management</h2>
           <input value={filter} onChange={(e)=>setFilter(e.target.value)} placeholder="Search customer, email, phone, vehicle, city" style={{padding:12,borderRadius:8,border:"1px solid #ccc",minWidth:280}} />
