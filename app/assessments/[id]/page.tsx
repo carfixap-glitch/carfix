@@ -160,6 +160,36 @@ export default function AssessmentPage({ params }: Props) {
 
   if (loading) return <main className="section"><div className="container">Loading assessment...</div></main>;
 
+  const showAiLoader = loading || busy;
+
+  if (showAiLoader) return (
+    <main className="ai-loading-page">
+      <div className="ai-loader-card">
+        <div className="ai-loader-scene" aria-hidden="true">
+          <div className="ai-grid"></div>
+          <div className="ai-scan-beam"></div>
+          <div className="ai-car">
+            <div className="ai-car-roof"></div>
+            <div className="ai-car-window"></div>
+            <div className="ai-car-body"></div>
+            <div className="ai-wheel ai-wheel-left"></div>
+            <div className="ai-wheel ai-wheel-right"></div>
+            <div className="ai-light"></div>
+          </div>
+          <div className="ai-radar"><i></i></div>
+          <div className="ai-dot dot-one"></div>
+          <div className="ai-dot dot-two"></div>
+          <div className="ai-dot dot-three"></div>
+        </div>
+        <div className="ai-loader-logo">Car<span>Fix</span></div>
+        <h1>{loading ? "Preparing your assessment" : "AI is inspecting your car"}</h1>
+        <p>{loading ? "Loading your photos and assessment details…" : "Scanning damage, identifying affected parts and preparing your repair estimate…"}</p>
+        <div className="ai-progress"><span></span></div>
+        <div className="ai-status"><b></b> {loading ? "Loading securely" : "AI analysis in progress"}</div>
+      </div>
+    </main>
+  );
+
   if (!a) return (
     <main className="section">
       <div className="container">
