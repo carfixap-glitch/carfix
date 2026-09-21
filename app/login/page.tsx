@@ -1,21 +1,10 @@
 "use client";
-
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase";
-
+function normalizePhone(value: string) { const digits = value.replace(new RegExp("\\D","g"),""); return digits.startsWith("91") ? "+" + digits : "+91" + digits; }
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const supabase = createClient();
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setMessage("Signing in...");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return setMessage(error.message);
-    window.location.href = "/dashboard";
-  }
-
-  return <main className="section"><div className="container" style={{maxWidth:520}}><a href="/">← CarFix</a><div className="card" style={{marginTop:25}}><h1>Welcome back</h1><p className="muted">Sign in to view your vehicle assessments.</p><form onSubmit={submit} style={{display:"grid",gap:14,marginTop:25}}><input aria-label="Email" type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}/><input aria-label="Password" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} required style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}/><button className="btn primary" type="submit">Sign in</button>{message && <p className="muted">{message}</p>}</form><p className="muted" style={{marginTop:20}}>New to CarFix? <a href="/register" style={{color:"#2563eb"}}>Create an account</a></p></div></div></main>;
+ const [phone,setPhone]=useState(""); const [otp,setOtp]=useState(""); const [otpSent,setOtpSent]=useState(false); const [message,setMessage]=useState(""); const supabase=createClient();
+ async function sendOtp(e: FormEvent) { e.preventDefault(); setMessage("Sending OTP..."); const normalizedPhone=normalizePhone(phone); if(normalizedPhone.length!==13)return setMessage("Enter a valid 10-digit Indian mobile number."); const {error}=await supabase.auth.signInWithOtp({phone:normalizedPhone,options:{shouldCreateUser:false}}); if(error)return setMessage(error.message); setOtpSent(true); setMessage("OTP sent. Enter the code below."); }
+ async function verifyOtp(e: FormEvent) { e.preventDefault(); setMessage("Verifying OTP..."); const normalizedPhone=normalizePhone(phone); const {error}=await supabase.auth.verifyOtp({phone:normalizedPhone,token:otp,type:"sms"}); if(error)return setMessage(error.message); window.location.href="/dashboard"; }
+ return <main className="section"><div className="container" style={{maxWidth:520}}><a href="/">← CarFix</a><div className="card" style={{marginTop:25}}><h1>Welcome back</h1><p className="muted">Sign in with your verified mobile number.</p>{!otpSent?<form onSubmit={sendOtp} style={{display:"grid",gap:14,marginTop:25}}><input type="tel" placeholder="Phone number (10 digits)" value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="numeric" maxLength={10} style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}/><button className="btn primary" type="submit">Send OTP</button>{message&&<p className="muted">{message}</p>}</form>:<form onSubmit={verifyOtp} style={{display:"grid",gap:14,marginTop:25}}><input type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={e=>setOtp(e.target.value.replace(new RegExp("\\D","g"),""))} required inputMode="numeric" maxLength={6} autoComplete="one-time-code" style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}/><button className="btn primary" type="submit">Verify OTP & Sign in</button><button type="button" onClick={()=>{setOtpSent(false);setMessage("");}} style={{padding:10,background:"transparent",border:0,cursor:"pointer"}}>Change phone number</button>{message&&<p className="muted">{message}</p>}</form>}<p className="muted" style={{marginTop:20}}>New to CarFix? <a href="/register" style={{color:"#2563eb"}}>Create an account</a></p></div></div></main>;
 }
