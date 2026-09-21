@@ -164,3 +164,5 @@ main.section>.container[style*="max-width:520px"]>a,main.section>.container[styl
 .workshop-services{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.workshop-services span{font-size:10px;padding:5px 8px;border-radius:999px;background:#f1f5f9;color:#475467}
 .workshop-actions{display:flex;gap:8px;flex-wrap:wrap}.workshop-empty{display:grid;gap:8px;margin-top:18px;padding:22px;border-radius:16px;background:#f8fafc;border:1px dashed #cbd5e1}.workshop-empty strong{font-size:14px}.workshop-empty span{color:#667085;font-size:12px}
 @media(max-width:700px){.workshop-item{grid-template-columns:36px 1fr}.workshop-rank{width:36px;height:36px}.workshop-actions{grid-column:2}.workshop-actions .btn{flex:1;text-align:center}}
+
+.workshop-heading-row{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}.workshop-heading-row>div{flex:1;min-width:240px}
