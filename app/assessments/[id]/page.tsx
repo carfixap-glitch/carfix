@@ -171,7 +171,7 @@ export default function AssessmentPage({ params }: Props) {
     setPaymentBusy(true);
     setMessage("Preparing secure payment…");
     try {
-      const { data, error } = await supabase.functions.invoke("create-razorpay-order", { body: { assessment_id: assessmentId } });
+      const { data, error } = await supabase.functions.invoke("create-razorpay-order-v2", { body: { assessment_id: assessmentId } });
       if (error) throw new Error(error.message || "Could not create payment order");
       if (data?.error) throw new Error(data.error);
       if (!data?.order_id) { await load(assessmentId); return; }
