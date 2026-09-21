@@ -102,46 +102,26 @@ export default function NewAssessmentPage() {
     window.location.href=`/assessments/${assessment.id}`;
   }
 
-  return <main className="section">
-    <div className="container" style={{maxWidth:760}}>
-      <a href="/dashboard">← Dashboard</a>
-      <div className="card" style={{marginTop:25}}>
-        <p className="muted">Step 1</p>
-        <h1>Start a car damage assessment</h1>
-        <p className="muted">Select your car and add clear photos of the damage. Your current GPS location will be captured automatically.</p>
-
-        <form onSubmit={submit} style={{display:"grid",gap:14,marginTop:25}}>
+  return <main className="assessment-new-page">
+    <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><a className="brand" href="/"><span>Car</span>Fix.</a><a className="btn" href="/dashboard">Dashboard</a></div></header>
+    <section className="section"><div className="container" style={{maxWidth:900}}>
+      <div className="assessment-progress"><span className="active">01</span><i></i><span>02</span><i></i><span>03</span><label>Vehicle</label><label>Photos</label><label>AI report</label></div>
+      <div className="assessment-new-heading"><div><div className="home-kicker">NEW ASSESSMENT</div><h1>Let's inspect your car.</h1><p className="muted">A few details and clear photos are all CarFix needs to create your preliminary body repair assessment.</p></div><div className="assessment-badge">✦ AI powered</div></div>
+      <form onSubmit={submit} className="new-assessment-grid">
+        <div className="card new-assessment-main">
+          <div className="form-section-title"><span>01</span><div><h2>Your vehicle</h2><p className="muted">Select the vehicle you want to inspect.</p></div></div>
           <div className="grid" style={{gridTemplateColumns:"1fr 1fr"}}>
-            <select value={make} onChange={e=>{setMake(e.target.value);setModel("");}} required style={{padding:14,border:"1px solid #d8dee9",borderRadius:9,background:"white"}}>
-              <option value="">Select car make</option>
-              {makes.map(item=><option key={item} value={item}>{item}</option>)}
-            </select>
-            <select value={model} onChange={e=>setModel(e.target.value)} required disabled={!make} style={{padding:14,border:"1px solid #d8dee9",borderRadius:9,background:"white"}}>
-              <option value="">{make ? "Select car model" : "Select make first"}</option>
-              {(carModels[make] ?? []).map(item=><option key={item} value={item}>{item}</option>)}
-            </select>
+            <select value={make} onChange={e=>{setMake(e.target.value);setModel("");}} required><option value="">Select car make</option>{makes.map(item=><option key={item} value={item}>{item}</option>)}</select>
+            <select value={model} onChange={e=>setModel(e.target.value)} required disabled={!make}><option value="">{make?"Select car model":"Select make first"}</option>{(carModels[make]??[]).map(item=><option key={item} value={item}>{item}</option>)}</select>
           </div>
-
-          <div style={{padding:14,border:"1px solid #d8dee9",borderRadius:9}}>
-            <strong>📍 Current location</strong>
-            <p className="muted" style={{margin:"6px 0"}}>{locationStatus}</p>
-            {coords && locationDetails.address && <p style={{margin:"6px 0"}}>{locationDetails.address}{locationDetails.city ? `, ${locationDetails.city}` : ""}{locationDetails.state ? `, ${locationDetails.state}` : ""}{locationDetails.pincode ? ` - ${locationDetails.pincode}` : ""}</p>}
-            
-            {!coords && <button type="button" className="btn" onClick={getCurrentLocation}>Get my location</button>}
-          </div>
-
-          <div style={{padding:20,border:"2px dashed #cbd5e1",borderRadius:12}}>
-            <h3>Damage photos</h3>
-            <p className="muted">Upload up to 10 photos. Use clear photos from different angles.</p>
-            <input ref={input} type="file" accept="image/*" multiple onChange={e=>addPhotos(e.target.files)} style={{marginTop:10}}/>
-            <p className="muted">{photos.length} photo{photos.length===1?"":"s"} selected</p>
-            {photos.length>0&&<ul>{photos.map((p,i)=><li key={`${p.name}-${i}`}>{p.name}</li>)}</ul>}
-          </div>
-
-          <button className="btn primary" disabled={busy} type="submit">{busy?"Saving…":"Create assessment"}</button>
-          {message&&<p className="muted">{message}</p>}
-        </form>
-      </div>
-    </div>
-  </main>;
-}
+          <div className="form-section-title" style={{marginTop:34}}><span>02</span><div><h2>Current location</h2><p className="muted">We'll securely capture your GPS location for this assessment.</p></div></div>
+          <div className={`location-card ${coords?"captured":""}`}><div className="location-icon">⌖</div><div><strong>{coords?"Location captured":"Location required"}</strong><p>{locationStatus}</p>{coords&&locationDetails.address&&<small>{locationDetails.address}{locationDetails.city?`, ${locationDetails.city}`:""}{locationDetails.state?`, ${locationDetails.state}`:""}{locationDetails.pincode?` — ${locationDetails.pincode}`:""}</small>}</div>{!coords&&<button type="button" className="btn" onClick={getCurrentLocation}>Use my location</button>}</div>
+          <div className="form-section-title" style={{marginTop:34}}><span>03</span><div><h2>Damage photos</h2><p className="muted">Use different angles. Up to 10 clear photos.</p></div></div>
+          <div className="photo-drop" onClick={()=>input.current?.click()}><div className="upload-icon">↑</div><strong>Upload damage photos</strong><span>JPG, PNG or HEIC · Multiple photos supported</span><button type="button" className="btn" onClick={(e)=>{e.stopPropagation();input.current?.click()}}>Choose photos</button><input ref={input} type="file" accept="image/*" multiple onChange={e=>addPhotos(e.target.files)}/></div>
+          {photos.length>0&&<div className="photo-list">{photos.map((p,i)=><div key={`${p.name}-${i}`}><span>✓</span><strong>{p.name}</strong><small>{(p.size/1024/1024).toFixed(1)} MB</small></div>)}</div>}
+          {message&&<div className="form-message">{message}</div>}
+        </div>
+        <aside className="assessment-side"><div className="card side-card"><div className="home-kicker">WHAT YOU'LL GET</div><h3>One clear report.</h3><ul><li><b>AI damage summary</b><span>Visible body damage identified from your photos.</span></li><li><b>Repair guidance</b><span>Repair, repaint, blend or replacement recommendations.</span></li><li><b>Cost range</b><span>Preliminary Indian-market body repair estimate.</span></li><li><b>Repair time</b><span>Estimated workshop time for the visible work.</span></li></ul><button className="home-primary-btn" disabled={busy} type="submit" style={{width:"100%",border:0,marginTop:12}}>{busy?"Creating assessment…":"Create assessment →"}</button><small className="muted" style={{display:"block",textAlign:"center",marginTop:12}}>Your photos stay securely in CarFix.</small></div></aside>
+      </form>
+    </div></section>
+  </main>
