@@ -126,7 +126,7 @@ export default function NewAssessmentPage() {
             <strong>📍 Current location</strong>
             <p className="muted" style={{margin:"6px 0"}}>{locationStatus}</p>
             {coords && locationDetails.address && <p style={{margin:"6px 0"}}>{locationDetails.address}{locationDetails.city ? `, ${locationDetails.city}` : ""}{locationDetails.state ? `, ${locationDetails.state}` : ""}{locationDetails.pincode ? ` - ${locationDetails.pincode}` : ""}</p>}
-            {coords && <small className="muted">GPS: {coords.latitude.toFixed(6)}, {coords.longitude.toFixed(6)} · Accuracy: ~{Math.round(coords.accuracy)} m</small>}
+            
             {!coords && <button type="button" className="btn" onClick={getCurrentLocation}>Get my location</button>}
           </div>
 
