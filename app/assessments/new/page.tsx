@@ -20,7 +20,6 @@ const carModels: Record<string, string[]> = {
   "Mitsubishi": ["Lancer","Lancer Cedia","Cedia","Pajero","Pajero Sport","Montero","Outlander","Carisma"],
   "Skoda": ["Octavia","Octavia RS","Fabia","Laura","Rapid","Rapid Monte Carlo","Yeti","Superb","Kushaq","Slavia","Kylaq","Kodiaq"],
   "Volkswagen": ["Polo","Polo GT","Polo GT TSI","Vento","Ameo","Jetta","Passat","Beetle","Touareg","Tiguan","Virtus","Taigun"],
-  "Mitsubishi": ["Lancer","Lancer Cedia","Cedia","Pajero","Pajero Sport","Montero","Outlander","Carisma"],
   "MG Motor": ["ZS EV","Hector","Hector Plus","Gloster","Astor","Comet EV","Windsor EV","Cyberster","Majestor"],
   "Jeep": ["Compass","Meridian","Wrangler","Grand Cherokee","Avenger"],
   "Citroën": ["C3","eC3","C3 Aircross","C3 Aircross X","Basalt"],
