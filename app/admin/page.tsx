@@ -75,7 +75,15 @@ export default function AdminPage() {
   const pending = rows.filter((r) => r.status === "pending" || r.status === "processing").length;
 
   return <main>
-    <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div className="brand"><span>Car</span>Fix <small style={{fontSize:13,marginLeft:8}}>Admin</small></div><button className="btn" onClick={logout}>Sign out</button></div></header>
+    <header className="nav">
+      <div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
+        <div className="brand"><span>Car</span>Fix <small style={{fontSize:13,marginLeft:8}}>Admin</small></div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <a className="btn" href="/admin/customers">👥 Customers</a>
+          <button className="btn" onClick={logout}>Sign out</button>
+        </div>
+      </div>
+    </header>
     <section className="section"><div className="container">
       <p className="muted">Administration</p><h1>CarFix Admin Dashboard</h1><p className="muted">Manage customers and their vehicle assessments.</p>
       {error && <div className="card" style={{marginTop:20}}><p>{error}</p></div>}
