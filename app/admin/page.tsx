@@ -104,55 +104,17 @@ export default function AdminPage() {
   const pending = rows.filter((r) => r.status === "pending" || r.status === "processing").length;
 
   return <main>
-    <header className="nav">
-      <div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
-        <div className="brand"><span>Car</span>Fix <small style={{fontSize:13,marginLeft:8}}>Admin</small></div>
-        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-          <a className="btn" href="/admin/customers">👥 Customers</a>
-          <button className="btn" onClick={logout}>Sign out</button>
-        </div>
-      </div>
-    </header>
-
+    <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}><div className="brand"><span>Car</span>Fix. <small style={{fontSize:11,color:"#667085"}}>ADMIN</small></div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><a className="btn" href="/admin/customers">Customers</a><a className="btn" href="/admin/manual-assessments">Manual assessments</a><button className="btn" onClick={logout}>Sign out</button></div></div></header>
     <section className="section"><div className="container">
-      <p className="muted">Administration</p>
-      <h1>CarFix Admin Dashboard</h1>
-      <p className="muted">Manage customers and their vehicle assessments. Create manual assessments directly for each customer from Assessment management.</p>
-
-      {error && <div className="card" style={{marginTop:20}}><p>{error}</p></div>}
-
-      <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginTop:24}}>
-        <div className="card"><p className="muted">Total assessments</p><h2>{rows.length}</h2></div>
-        <div className="card"><p className="muted">Completed</p><h2>{completed}</h2></div>
-        <div className="card"><p className="muted">Pending / processing</p><h2>{pending}</h2></div>
-        <a className="card" href="/admin/manual-assessments" style={{textDecoration:"none",color:"inherit"}}>
-          <p className="muted">📝 Manual assessments</p>
-          <h2>{manualCount}</h2>
-          <p className="muted" style={{marginTop:6}}>Click to view all →</p>
-        </a>
-      </div>
-
-      <div className="card" style={{marginTop:24}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-          <h2>Assessment management</h2>
-          <input value={filter} onChange={(e)=>setFilter(e.target.value)} placeholder="Search customer, email, phone, vehicle, city" style={{padding:12,borderRadius:8,border:"1px solid #ccc",minWidth:280}} />
-        </div>
-        <div style={{display:"grid",gap:12,marginTop:18}}>
-          {visible.map((r)=><div key={r.id} className="card" style={{padding:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><strong>{r.profile?.full_name || "Customer"}</strong><span className="muted">{new Date(r.created_at).toLocaleString("en-IN")}</span></div>
-            <p style={{marginTop:6}}><strong>Email:</strong> {r.profile?.email || "No email"}</p>
-            <p style={{marginTop:4}}><strong>Phone:</strong> {r.profile?.phone || "No phone"} · {r.vehicle?.make || "Vehicle"} {r.vehicle?.model || ""} {r.vehicle?.year ? `(${r.vehicle.year})` : ""}</p>
-            <div style={{marginTop:8,padding:10,borderRadius:8,background:"#f8fafc"}}>
-              <strong>📍 Customer location</strong>
-              <p className="muted" style={{marginTop:4}}>{[r.address,r.city,r.state].filter(Boolean).join(", ")}{r.pincode ? ` - ${r.pincode}` : ""}{r.country ? `, ${r.country}` : ""}</p>
-            </div>
-            {r.severity && <p style={{marginTop:6}}><strong>AI severity:</strong> {r.severity}</p>}
-            {r.minCost != null && r.maxCost != null && <p><strong>Estimate:</strong> ₹{Number(r.minCost).toLocaleString("en-IN")} – ₹{Number(r.maxCost).toLocaleString("en-IN")}</p>}
-            <div style={{display:"flex",gap:10,alignItems:"center",marginTop:10,flexWrap:"wrap"}}><select value={r.status || "pending"} onChange={(e)=>updateStatus(r.id,e.target.value)}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><a className="btn primary" href={`/assessments/${r.id}`}>View assessment</a><a className="btn" href={`/admin/customers/${r.user_id}/manual-assessment`}>📝 Manual Assessment</a></div>
-          </div>)}
-          {!visible.length && <p className="muted">No matching assessments.</p>}
-        </div>
-      </div>
+      <div className="admin-hero"><div style={{position:"relative",zIndex:1}}><div className="home-kicker">CARFIX CONTROL CENTER</div><h1>Everything in view.</h1><p>Monitor customer assessments, AI reports and manual workshop assessments from one workspace.</p></div></div>
+      {error&&<div className="card" style={{marginTop:20}}><p>{error}</p></div>}
+      <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginTop:22}}><div className="app-stat"><span>Total assessments</span><strong>{rows.length}</strong></div><div className="app-stat"><span>Completed</span><strong>{completed}</strong></div><div className="app-stat"><span>Pending / processing</span><strong>{pending}</strong></div><a className="app-stat" href="/admin/manual-assessments" style={{textDecoration:"none",color:"inherit"}}><span>Manual assessments</span><strong>{manualCount}</strong></a></div>
+      <div className="card" style={{marginTop:28,padding:25}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:20,flexWrap:"wrap"}}><div><div className="home-kicker">ASSESSMENT MANAGEMENT</div><h2 style={{fontSize:28,letterSpacing:-1,margin:"8px 0 0"}}>Customer assessments</h2></div><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Search customer, vehicle or city" style={{padding:12,borderRadius:10,minWidth:280}}/></div>
+      <div style={{display:"grid",gap:12,marginTop:20}}>{visible.map(r=><div key={r.id} className="assessment-card">
+        <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{r.profile?.full_name||"Customer"}</strong><p className="muted" style={{margin:"4px 0 0",fontSize:11}}>{r.profile?.phone||"No phone"} · {r.profile?.email||"No email"}</p></div><span className="home-pill">{r.status||"pending"}</span></div>
+        <div className="admin-assessment-meta"><div><small>CUSTOMER VEHICLE</small><strong>{r.vehicle?.make||"Vehicle"} {r.vehicle?.model||""}</strong></div><div><small>LOCATION</small><strong>{r.city||"Not provided"}</strong></div><div><small>AI SEVERITY</small><strong>{r.severity||"—"}</strong></div><div><small>ESTIMATE</small><strong>{r.minCost!=null&&r.maxCost!=null?`₹${Number(r.minCost).toLocaleString("en-IN")} – ₹${Number(r.maxCost).toLocaleString("en-IN")}`:"—"}</strong></div></div>
+        <div className="admin-location">📍 {[r.address,r.city,r.state].filter(Boolean).join(", ")}{r.pincode?` — ${r.pincode}`:""}{r.country?`, ${r.country}`:""}</div>
+        <div style={{display:"flex",gap:9,alignItems:"center",marginTop:14,flexWrap:"wrap"}}><select value={r.status||"pending"} onChange={e=>updateStatus(r.id,e.target.value)} style={{padding:9}}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><a className="btn primary" href={`/assessments/${r.id}`}>View assessment →</a><a className="btn" href={`/admin/customers/${r.user_id}/manual-assessment`}>Create manual assessment</a></div>
+      </div>)}{!visible.length&&<p className="muted" style={{padding:25,textAlign:"center"}}>No matching assessments.</p>}</div></div>
     </div></section>
   </main>;
-}
