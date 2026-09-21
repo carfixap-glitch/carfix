@@ -2,25 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { useParams } from "next/navigation";
 
 type Customer = { id:string; full_name:string|null; phone:string|null; email:string|null };
 type Vehicle = { id:string; make:string|null; model:string|null; year:number|null };
 
-export default function ManualAssessmentPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ManualAssessmentPage() {
   const supabase = createClient();
+  const routeParams = useParams<{ id: string }>();
+  const customerId = typeof routeParams?.id === "string" ? routeParams.id : "";
   const [customer,setCustomer]=useState<Customer|null>(null); const [vehicles,setVehicles]=useState<Vehicle[]>([]);
   const [vehicleId,setVehicleId]=useState(""); const [damage,setDamage]=useState(""); const [parts,setParts]=useState("");
   const [recommendations,setRecommendations]=useState(""); const [repair,setRepair]=useState(""); const [minCost,setMinCost]=useState(""); const [maxCost,setMaxCost]=useState("");
   const [time,setTime]=useState(""); const [shopName,setShopName]=useState(""); const [shopPhone,setShopPhone]=useState(""); const [shopAddress,setShopAddress]=useState(""); const [services,setServices]=useState(""); const [notes,setNotes]=useState("");
   const [saving,setSaving]=useState(false); const [error,setError]=useState("");
 
-  useEffect(()=>{(async()=>{ const {id}=await params; const {data:{user}}=await supabase.auth.getUser(); if(!user){window.location.href="/login";return;}
+  useEffect(()=>{(async()=>{ const id=customerId; if(!id){setError("Customer ID is missing from the URL");return;} const {data:{user}}=await supabase.auth.getUser(); if(!user){window.location.href="/login";return;}
     const {data:admin}=await supabase.from("profiles").select("role").eq("id",user.id).single(); if(admin?.role!=="admin"){window.location.href="/dashboard";return;}
     const [{data:c},{data:v}]=await Promise.all([supabase.from("profiles").select("id,full_name,phone,email").eq("id",id).eq("role","customer").single(),supabase.from("vehicles").select("id,make,model,year").eq("user_id",id).order("created_at",{ascending:false})]);
     if(!c){setError("Customer not found");return;} setCustomer(c);setVehicles(v??[]);if(v?.[0])setVehicleId(v[0].id);
   })().catch(e=>setError(e.message));},[]);
 
-  async function save(){ setSaving(true);setError(""); const {data:{user}}=await supabase.auth.getUser(); if(!user){setError("Admin session expired");setSaving(false);return;} if(!customer?.id){setError("Customer ID is missing. Please reopen this assessment from Assessment Management.");setSaving(false);return;}
+  async function save(){ setSaving(true);setError(""); const {data:{user}}=await supabase.auth.getUser(); if(!user){setError("Admin session expired");setSaving(false);return;} if(!customer.id){setError("Customer ID is missing. Please reopen this assessment from Assessment Management.");setSaving(false);return;}
     const {data,error}=await supabase.from("manual_assessments").insert({customer_id:customer.id,vehicle_id:vehicleId||null,damage_description:damage,damaged_parts:parts.split("\n").map(x=>x.trim()).filter(Boolean),recommendations,repair_or_replacement:repair,estimated_min_cost:minCost?Number(minCost):null,estimated_max_cost:maxCost?Number(maxCost):null,estimated_time:time,shop_name:shopName,shop_phone:shopPhone,shop_address:shopAddress,shop_services:services.split(",").map(x=>x.trim()).filter(Boolean),additional_notes:notes,created_by:user.id}).select("id").single();
     if(error){setError(error.message);setSaving(false);return;} window.location.href=`/admin/customers/${customer.id}/manual-assessment/${data.id}`;
   }
