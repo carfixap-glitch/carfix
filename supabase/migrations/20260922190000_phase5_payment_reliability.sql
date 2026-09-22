@@ -23,7 +23,7 @@ create or replace function public.finalize_razorpay_payment(
 )
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = pg_catalog, public
 as $$
 declare
@@ -75,7 +75,7 @@ create or replace function public.reconcile_razorpay_webhook(
 )
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = pg_catalog, public
 as $$
 declare
