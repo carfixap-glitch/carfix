@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { getFunctionErrorMessage } from "@/lib/function-error";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -225,8 +226,9 @@ export default function AssessmentPage({ params }: Props) {
         body: { assessment_id: assessmentId },
       });
 
-      if (error) throw new Error(error.message || "AI analysis request failed");
-      if (data?.error) throw new Error(data.error);
+      if (error) throw new Error(await getFunctionErrorMessage(error, "AI analysis request failed"));
+      if (typeof data?.error === "string") throw new Error(data.error);
+      if (data?.error?.message) throw new Error(data.error.message);
 
       await load(assessmentId);
       setMessage("Analysis completed successfully.");
