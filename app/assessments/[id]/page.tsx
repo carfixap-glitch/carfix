@@ -195,7 +195,7 @@ export default function AssessmentPage({ params }: Props) {
         handler: async (response: any) => {
           try {
             setMessage("Verifying your payment securely…");
-            const { data: verified, error: verifyError } = await supabase.functions.invoke("verify-razorpay-payment", {
+            const { data: verified, error: verifyError } = await supabase.functions.invoke("verify-razorpay-payment-v2", {
               body: { assessment_id: assessmentId, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature },
             });
             if (verifyError) throw new Error(verifyError.message || "Payment verification failed");
