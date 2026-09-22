@@ -64,63 +64,67 @@ export default function AssessmentPage({ params }: Props) {
 
       const canViewFullAssessment = admin || !data.payment_required || data.payment_status === "free" || data.payment_status === "paid";
 
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from("vehicles")
-        .select("*")
-        .eq("id", data.vehicle_id)
-        .maybeSingle();
-      if (vehicleError) throw new Error(`Could not load vehicle: ${vehicleError.message}`);
-      setVehicle(vehicleData);
-
-      const { data: ps, error: photoError } = await supabase
-        .from("assessment_photos")
-        .select("*")
-        .eq("assessment_id", id);
-      if (photoError) throw new Error(`Could not load assessment photos: ${photoError.message}`);
-
-      if (ps) {
-        const withUrls = await Promise.all(ps.map(async (p) => {
-          const { data: u } = await supabase
-            .storage
-            .from("carfix-damage-photos")
-            .createSignedUrl(p.storage_path, 3600);
-          return { ...p, url: u?.signedUrl };
-        }));
-        setPhotos(withUrls);
-      }
-
-      if (canViewFullAssessment) {
-        const { data: da, error: daError } = await supabase
-          .from("damage_analysis")
-          .select("*")
-          .eq("assessment_id", id)
-          .maybeSingle();
-        if (daError) throw new Error(`Could not load AI analysis: ${daError.message}`);
-
-        const { data: re, error: reError } = await supabase
-          .from("repair_estimates")
-          .select("*")
-          .eq("assessment_id", id)
-          .maybeSingle();
-        if (reError) throw new Error(`Could not load repair estimate: ${reError.message}`);
-
-        setAnalysis(da);
-        setEstimate(re);
-      } else {
-        setAnalysis(null);
-        setEstimate(null);
-      }
-
       const city = String(data.city ?? "").trim();
       const latitude = Number(data.latitude);
       const longitude = Number(data.longitude);
-      if (city) {
-        const { data: nearbyGarages } = await supabase
+
+      const vehicleQuery = supabase.from("vehicles").select("*").eq("id", data.vehicle_id).maybeSingle();
+      const photosQuery = supabase.from("assessment_photos").select("*").eq("assessment_id", id);
+      const analysisQuery = canViewFullAssessment
+        ? supabase
+          .from("damage_analysis")
+          .select("*")
+          .eq("assessment_id", id)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null });
+      const estimateQuery = canViewFullAssessment
+        ? supabase
+          .from("repair_estimates")
+          .select("*")
+          .eq("assessment_id", id)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null });
+      const garagesQuery = city
+        ? supabase
           .from("garages")
           .select("id, name, phone, address, city, services, latitude, longitude, workshop_category")
           .eq("workshop_category", "body_paint")
           .ilike("city", city)
-          .limit(10);
+          .limit(10)
+        : Promise.resolve({ data: [], error: null });
+
+      const [
+        { data: vehicleData, error: vehicleError },
+        { data: ps, error: photoError },
+        { data: analysisData, error: analysisError },
+        { data: estimateData, error: estimateError },
+        { data: nearbyGarages, error: garagesError },
+      ] = await Promise.all([vehicleQuery, photosQuery, analysisQuery, estimateQuery, garagesQuery]);
+
+      if (vehicleError) throw new Error(`Could not load vehicle: ${vehicleError.message}`);
+      if (photoError) throw new Error(`Could not load assessment photos: ${photoError.message}`);
+      if (analysisError) throw new Error(`Could not load AI analysis: ${analysisError.message}`);
+      if (estimateError) throw new Error(`Could not load repair estimate: ${estimateError.message}`);
+      if (garagesError) throw new Error(`Could not load nearby workshops: ${garagesError.message}`);
+
+      setVehicle(vehicleData);
+      setAnalysis(analysisData);
+      setEstimate(estimateData);
+
+      if (ps?.length) {
+        const assessmentPhotos = ps as Array<Record<string, unknown> & { storage_path: string }>;
+        const paths = assessmentPhotos.map(photo => photo.storage_path);
+        const { data: signedUrls, error: signedUrlError } = await supabase
+          .storage
+          .from("carfix-damage-photos")
+          .createSignedUrls(paths, 3600);
+        if (signedUrlError) throw new Error(`Could not load assessment photos: ${signedUrlError.message}`);
+        setPhotos(assessmentPhotos.map((photo, index) => ({ ...photo, url: signedUrls?.[index]?.signedUrl })));
+      } else {
+        setPhotos([]);
+      }
+
+      if (city) {
         const ranked = (nearbyGarages ?? []).map((garage: any) => {
           const glat = Number(garage.latitude);
           const glon = Number(garage.longitude);
