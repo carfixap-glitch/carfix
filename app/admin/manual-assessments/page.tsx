@@ -95,6 +95,7 @@ export default function ManualAssessmentsPage() {
           <div className="brand"><span>Car</span>Fix <small style={{ fontSize: 11, marginLeft: 8, color: "#667085" }}>ADMIN</small></div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <a className="btn" href="/admin">Admin dashboard</a>
+            <a className="btn" href="/admin/payments">Payments</a>
             <a className="btn" href="/admin/customers">Customers</a>
             <button className="btn" onClick={logout}>Sign out</button>
           </div>
