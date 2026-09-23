@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -164,6 +165,11 @@ Deno.serve(async (req: Request) => {
     if (userError || !user) throw new AppError(401, "unauthorized", "Please sign in again.");
     userId = user.id;
     db = createClient(url, adminKey);
+
+    const rateLimit = await checkRateLimit(db, userId, "analyze_assessment", 5, 3600);
+    if (!rateLimit.allowed) {
+      throw new AppError(429, "openai_rate_limit", `Too many AI requests. Try again in ${rateLimit.retryAfterSeconds} seconds.`, true);
+    }
 
     let requestBody: { assessment_id?: unknown };
     try {

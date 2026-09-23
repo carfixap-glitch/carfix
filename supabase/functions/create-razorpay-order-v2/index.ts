@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -57,6 +58,11 @@ Deno.serve(async (req: Request) => {
     const key = serverKey();
     if (!key) return safeError(500, "server_configuration", "Payment service is temporarily unavailable.", true);
     const db = createClient(Deno.env.get("SUPABASE_URL")!, key);
+
+    const rateLimit = await checkRateLimit(db, user.id, "create_payment_order", 10, 600);
+    if (!rateLimit.allowed) {
+      return safeError(429, "rate_limit_exceeded", `Too many payment attempts. Try again in ${rateLimit.retryAfterSeconds} seconds.`, true);
+    }
 
     const { data: assessment, error: assessmentError } = await db
       .from("assessments")

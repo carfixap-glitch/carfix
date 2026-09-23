@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -72,6 +73,11 @@ Deno.serve(async (req: Request) => {
     const secret = Deno.env.get("RAZORPAY_KEY_SECRET");
     if (!key || !secret) return fail(500, "server_configuration", "Payment verification is temporarily unavailable.", true);
     const db = createClient(Deno.env.get("SUPABASE_URL")!, key);
+
+    const rateLimit = await checkRateLimit(db, user.id, "verify_payment", 20, 600);
+    if (!rateLimit.allowed) {
+      return fail(429, "rate_limit_exceeded", `Too many verification attempts. Try again in ${rateLimit.retryAfterSeconds} seconds.`, true);
+    }
 
     const { data: assessment, error: assessmentError } = await db.from("assessments")
       .select("id,payment_required,payment_status")
