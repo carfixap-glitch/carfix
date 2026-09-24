@@ -172,7 +172,11 @@ export default function AssessmentPage({ params }: Props) {
 
       setLoading(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load assessment");
+      setMessage(
+        error instanceof Error && error.message === "Assessment not found or you do not have permission to view it."
+          ? error.message
+          : "Could not load this assessment. Please try again.",
+      );
       setLoading(false);
     }
   }
@@ -183,9 +187,9 @@ export default function AssessmentPage({ params }: Props) {
       if (!active) return;
       setAssessmentId(id);
       load(id);
-    }).catch((error) => {
+    }).catch(() => {
       if (active) {
-        setMessage(error instanceof Error ? error.message : "Could not open assessment");
+        setMessage("Could not open this assessment. Please return to your dashboard and try again.");
         setLoading(false);
       }
     });
