@@ -177,3 +177,9 @@ main.section>.container[style*="max-width:520px"]>a,main.section>.container[styl
 @media(max-width:700px){.workshop-item{grid-template-columns:36px 1fr}.workshop-rank{width:36px;height:36px}.workshop-actions{grid-column:2}.workshop-actions .btn{flex:1;text-align:center}}
 
 .workshop-heading-row{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}.workshop-heading-row>div{flex:1;min-width:240px}
+
+/* Safe recovery screens */
+.failure-page{min-height:100vh;display:grid;place-items:center;padding:28px;background:radial-gradient(circle at 50% 15%,rgba(37,99,235,.2),transparent 35%),#07111f;color:#fff}
+.failure-card{width:min(600px,100%);padding:38px;border:1px solid rgba(255,255,255,.13);border-radius:24px;background:rgba(255,255,255,.055);box-shadow:0 35px 90px rgba(0,0,0,.3);text-align:center}
+.failure-kicker{font-size:10px;letter-spacing:1.8px;color:#60a5fa;font-weight:900}.failure-card h1{font-size:clamp(34px,6vw,52px);letter-spacing:-2px;margin:14px 0}.failure-card p{max-width:470px;margin:0 auto;color:#aeb9ca;line-height:1.65}.failure-card code{display:inline-block;margin-top:18px;padding:8px 11px;border-radius:8px;background:rgba(255,255,255,.07);color:#cbd5e1;font-size:11px}.failure-actions{display:flex;justify-content:center;gap:10px;margin-top:24px}.failure-actions button{cursor:pointer;font:inherit}.failure-actions .btn:not(.primary){color:#fff;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15)}
+@media(max-width:520px){.failure-card{padding:28px 20px}.failure-actions{flex-direction:column}.failure-actions .btn{width:100%}}
