@@ -14,6 +14,7 @@ const contentSecurityPolicy = [
   "frame-src https://challenges.cloudflare.com https://*.razorpay.com",
   "worker-src 'self' blob:",
   "media-src 'self' blob: https://*.supabase.co",
+  "report-uri /api/csp-report",
 ].join("; ");
 
 const securityHeaders = [
