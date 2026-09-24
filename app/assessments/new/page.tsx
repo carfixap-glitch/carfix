@@ -92,13 +92,13 @@ export default function NewAssessmentPage() {
       .insert({user_id:user.id,make,model,year:null,registration_number:null})
       .select("id").single();
 
-    if(ve){setBusy(false);setMessage(ve.message);return;}
+    if(ve){setBusy(false);setMessage("Could not save your vehicle details. Please try again.");return;}
 
     const {data:assessment,error:ae}=await supabase.from("assessments")
       .insert({user_id:user.id,vehicle_id:vehicle.id,city:locationDetails.city || null,latitude:coords.latitude,longitude:coords.longitude,gps_accuracy:coords.accuracy,location_captured_at:new Date().toISOString(),address:locationDetails.address || null,state:locationDetails.state || null,pincode:locationDetails.pincode || null,country:locationDetails.country || null,status:"pending"})
       .select("id").single();
 
-    if(ae){setBusy(false);setMessage(ae.message);return;}
+    if(ae){setBusy(false);setMessage("Could not create your assessment. Please try again.");return;}
 
     const uploadedPaths:string[]=[];
     try{
@@ -120,10 +120,10 @@ export default function NewAssessmentPage() {
         uploadedPaths.map(storage_path=>({assessment_id:assessment.id,storage_path,photo_type:"damage"}))
       );
       if(photoError)throw new Error(photoError.message);
-    }catch(error){
+    }catch{
       if(uploadedPaths.length)await supabase.storage.from("carfix-damage-photos").remove(uploadedPaths);
       setBusy(false);
-      setMessage(`Photo upload failed: ${error instanceof Error?error.message:"Please try again."}`);
+      setMessage("Could not upload your photos. Please check your connection and try again.");
       return;
     }
 
