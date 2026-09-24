@@ -17,15 +17,20 @@ export async function proxy(request: NextRequest) {
     next.headers.set("x-request-id", requestId);
     return next;
   };
+  let response = nextResponse();
   const redirect = (path: string) => {
     const redirected = NextResponse.redirect(new URL(path, request.url));
+    response.cookies.getAll().forEach((cookie) => redirected.cookies.set(cookie));
     redirected.headers.set("x-request-id", requestId);
     return redirected;
   };
 
-  let response = nextResponse();
   const path = request.nextUrl.pathname;
-  if (!path.startsWith("/admin") || path === "/admin/login") return response;
+  const isAdminRoute =
+    (path === "/admin" || path.startsWith("/admin/")) && path !== "/admin/login";
+  const isCustomerRoute =
+    path === "/dashboard" || path === "/assessments" || path.startsWith("/assessments/");
+  if (!isAdminRoute && !isCustomerRoute) return response;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,17 +38,22 @@ export async function proxy(request: NextRequest) {
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookies) => {
+        setAll: (cookies, headers) => {
           cookies.forEach(({ name, value }) => request.cookies.set(name, value));
           response = nextResponse();
           cookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          Object.entries(headers).forEach(([name, value]) => response.headers.set(name, value));
         },
       },
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return redirect("/admin/login");
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  if (claimsError || !claimsData?.claims?.sub) {
+    return redirect(isAdminRoute ? "/admin/login" : "/login");
+  }
+
+  if (isCustomerRoute) return response;
 
   const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin");
   if (adminError || isAdmin !== true) {
