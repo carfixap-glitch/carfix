@@ -129,26 +129,54 @@ Deno.serve(async (req: Request) => {
     }
     if (reserveError || !reservation) return safeError(500, "payment_reservation_failed", "Could not prepare the payment.", true);
 
-    const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + btoa(razorpayKeyId + ":" + razorpaySecret),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        amount: Math.round(amountRupees * 100),
-        currency: "INR",
-        receipt,
-        notes: { assessment_id: assessmentId, user_id: user.id },
-      }),
-    });
-    const raw = await razorpayResponse.text();
-    if (!razorpayResponse.ok) {
+    let razorpayResponse: Response;
+    try {
+      razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(razorpayKeyId + ":" + razorpaySecret),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: Math.round(amountRupees * 100),
+          currency: "INR",
+          receipt,
+          notes: { assessment_id: assessmentId, user_id: user.id },
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
       await db.from("payments").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", reservation.id);
+      console.error("Razorpay order request failed", {
+        paymentId: reservation.id,
+        reason: error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "network_error",
+      });
       return safeError(502, "gateway_order_failed", "Razorpay could not create the payment order. Please try again.", true);
     }
 
-    const order = JSON.parse(raw);
+    const raw = await razorpayResponse.text();
+    if (!razorpayResponse.ok) {
+      await db.from("payments").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", reservation.id);
+      console.error("Razorpay order request was rejected", {
+        paymentId: reservation.id,
+        status: razorpayResponse.status,
+      });
+      return safeError(502, "gateway_order_failed", "Razorpay could not create the payment order. Please try again.", true);
+    }
+
+    let order: { id?: string; amount?: number; currency?: string };
+    try {
+      order = JSON.parse(raw);
+    } catch {
+      await db.from("payments").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", reservation.id);
+      console.error("Razorpay returned an invalid order response", { paymentId: reservation.id });
+      return safeError(502, "gateway_invalid_response", "Razorpay returned an invalid response. Please try again.", true);
+    }
+    if (!order.id || !order.amount || !order.currency) {
+      await db.from("payments").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", reservation.id);
+      console.error("Razorpay returned an incomplete order response", { paymentId: reservation.id });
+      return safeError(502, "gateway_invalid_response", "Razorpay returned an invalid response. Please try again.", true);
+    }
     const { error: updateError } = await db.from("payments")
       .update({ order_id: order.id, updated_at: new Date().toISOString() })
       .eq("id", reservation.id)
