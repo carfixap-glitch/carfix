@@ -20,7 +20,7 @@ export default function DashboardPage(){
   ]);
   const vm=new Map((vehicles??[]).map((v:any)=>[v.id,v])),am=new Map((analyses??[]).map((a:any)=>[a.assessment_id,a])),em=new Map((estimates??[]).map((e:any)=>[e.assessment_id,e]));
   setAssessments(base.map((a:any)=>({id:a.id,city:a.city,status:a.status,created_at:a.created_at,payment_required:a.payment_required,payment_status:a.payment_status,payment_amount:a.payment_amount,vehicle:vm.get(a.vehicle_id)??null,severity:am.get(a.id)?.severity??null,minCost:em.get(a.id)?.estimated_min_cost??null,maxCost:em.get(a.id)?.estimated_max_cost??null}))); setLoading(false);
- }catch(e){setError(e instanceof Error?e.message:"Could not load dashboard");setLoading(false)}})()},[]);
+ }catch{setError("Could not load your dashboard. Please try again.");setLoading(false)}})()},[]);
  async function logout(){await supabase.auth.signOut();window.location.href="/"}
  if(loading)return <main className="dashboard-page"><header className="nav"><div className="container"><span className="brand"><span>Car</span>Fix.</span></div></header><section className="section"><div className="container" aria-live="polite" aria-busy="true"><div className="dashboard-skeleton dashboard-skeleton-hero"/><div className="dashboard-stats-grid"><div className="dashboard-skeleton"/><div className="dashboard-skeleton"/><div className="dashboard-skeleton"/></div><div className="dashboard-skeleton dashboard-skeleton-list"/><span className="sr-only">Loading your CarFix workspace…</span></div></section></main>;
  const completed=assessments.filter(a=>a.status==="completed").length;
