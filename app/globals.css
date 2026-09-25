@@ -194,3 +194,13 @@ main.section>.container[style*="max-width:520px"]>a,main.section>.container[styl
 .legal-links{display:flex;flex-wrap:wrap;gap:18px;margin-top:38px;padding-top:24px;border-top:1px solid rgba(255,255,255,.09)}.legal-links a,.home-legal-links a,.auth-consent a{color:#42d6b5;text-decoration:none}.legal-links a:hover,.home-legal-links a:hover,.auth-consent a:hover{text-decoration:underline}
 .home-legal-links{display:flex;gap:16px;flex-wrap:wrap}.auth-consent{font-size:12px;line-height:1.55;color:#8296aa;margin:2px 0 4px}
 @media(max-width:640px){.legal-page{padding:24px 12px}.legal-card{padding:28px 20px;border-radius:18px}.legal-card h1{font-size:32px}.home-legal-links{justify-content:center}}
+
+
+/* CarFix support workspace */
+.support-section{background:linear-gradient(180deg,#f7f8fc,#eef4fb);min-height:calc(100vh - 70px)}
+.support-assistant-card{margin-bottom:20px;border-color:#dbe7f5;background:linear-gradient(135deg,#07111f,#102747);color:#fff;box-shadow:0 20px 55px rgba(7,17,31,.12)}
+.support-assistant-card .muted{color:#aeb9ca}.support-assistant-card label{color:#dbe7f3}.support-assistant-card textarea{background:#fff;color:#101828}
+.support-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.4fr);gap:20px;align-items:start}.admin-support-grid{margin-top:24px}
+.support-ticket-list,.support-conversation{box-shadow:0 10px 35px rgba(16,24,40,.045)}.support-conversation{min-height:360px}
+.support-conversation>div[style*="display: grid"]>div{background:#f8fafc;border-color:#e4e7ec!important}
+@media(max-width:820px){.support-grid{grid-template-columns:1fr}.support-conversation{min-height:0}}
