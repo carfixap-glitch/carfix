@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase9-reliability-hardening
+      - phase11-gemini-assessment-fallback
   workflow_dispatch:
 
 permissions:
