@@ -18,7 +18,8 @@ type ErrorCode =
   | "openai_spend_limit"
   | "openai_usage_limit"
   | "openai_rate_limit"
-  | "openai_unavailable"\n  | "openai_timeout"
+  | "openai_unavailable"
+  | "openai_timeout"
   | "configuration_error"
   | "analysis_failed";
 
