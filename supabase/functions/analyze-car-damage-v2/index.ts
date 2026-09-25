@@ -102,7 +102,7 @@ async function callOpenAI(key: string, body: unknown) {
   const maxAttempts = 3;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    let response: Response;\n    try {\n      response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
