@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 
 type Ticket={id:string;ticket_number:string;user_id:string;assessment_id:string|null;category:string;subject:string;status:string;created_at:string;updated_at:string;resolved_at:string|null;customer?:{full_name:string|null;phone:string|null;email:string|null}|null};
@@ -21,7 +21,8 @@ export default function AdminSupportPage(){
   const enriched=base.map(t=>({...t,customer:pm.get(t.user_id)??null}));setTickets(enriched);
   if(selected){const fresh=enriched.find(t=>t.id===selected.id);if(fresh)setSelected(fresh)}
  }
- async function loadMessages(ticket:Ticket){setSelected(ticket);setError("");const {data,error}=await supabase.from("support_messages").select("id,sender_type,sender_user_id,message,created_at").eq("ticket_id",ticket.id).order("created_at",{ascending:true});if(error){setError("Could not load this conversation.");return}setMessages((data??[]) as Message[])}
+ const loadMessages=useCallback(async(ticket:Ticket,quiet=false)=>{setSelected(ticket);if(!quiet)setError("");const {data,error}=await supabase.from("support_messages").select("id,sender_type,sender_user_id,message,created_at").eq("ticket_id",ticket.id).order("created_at",{ascending:true});if(error){if(!quiet)setError("Could not load this conversation.");return}setMessages((data??[]) as Message[])},[supabase]);
+ useEffect(()=>{if(!selected||!adminId)return;const timer=window.setInterval(async()=>{try{await Promise.all([loadMessages(selected,true),loadTickets()])}catch{}},5000);return()=>window.clearInterval(timer)},[selected?.id,adminId,loadMessages]);
  useEffect(()=>{(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;setAdminId(user.id);await loadTickets()}catch{setError("Could not load support tickets.")}finally{setLoading(false)}})()},[]);
  async function changeStatus(status:string){if(!selected)return;setSaving(true);setError("");try{const patch={status,updated_at:new Date().toISOString(),resolved_at:status==="resolved"?new Date().toISOString():null};const {error}=await supabase.from("support_tickets").update(patch).eq("id",selected.id);if(error)throw error;const next={...selected,...patch};setSelected(next);setTickets(current=>current.map(t=>t.id===next.id?next:t))}catch{setError("Could not update ticket status.")}finally{setSaving(false)}}
  async function sendReply(e:FormEvent){e.preventDefault();if(!selected||!reply.trim()||selected.status==="resolved")return;setSaving(true);setError("");try{
@@ -34,15 +35,15 @@ export default function AdminSupportPage(){
  if(loading)return <main className="section"><div className="container">Loading support dashboard...</div></main>;
  return <main>
   <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}><a className="brand" href="/admin"><span>Car</span>Fix. <small style={{fontSize:11,color:"#667085"}}>ADMIN</small></a><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><a className="btn" href="/admin">Assessments</a><a className="btn" href="/admin/payments">Payments</a><a className="btn" href="/admin/customers">Customers</a></div></div></header>
-  <section className="section"><div className="container">
+  <section className="section support-section"><div className="container">
    <div className="admin-hero"><div style={{position:"relative",zIndex:1}}><div className="home-kicker">SUPPORT CONTROL CENTER</div><h1>Customer support & grievances.</h1><p>Review customer requests, reply inside their CarFix account and track each ticket through resolution.</p></div></div>
    {error&&<div className="card" style={{marginTop:20}}><p>{error}</p></div>}
    <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)",marginTop:22}}><div className="app-stat"><span>Total tickets</span><strong>{tickets.length}</strong></div><div className="app-stat"><span>Active</span><strong>{openCount}</strong></div><div className="app-stat"><span>Resolved</span><strong>{resolvedCount}</strong></div></div>
-   <div style={{display:"grid",gridTemplateColumns:"minmax(300px,1fr) minmax(360px,1.4fr)",gap:20,alignItems:"start",marginTop:24}}>
-    <div className="card"><div className="home-kicker">TICKETS</div><div style={{display:"grid",gap:10,marginTop:14}}><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Search ticket or customer"/><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option>{statuses.map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></div>
+   <div className="support-grid admin-support-grid">
+    <div className="card support-ticket-list"><div className="home-kicker">TICKETS</div><div style={{display:"grid",gap:10,marginTop:14}}><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Search ticket or customer"/><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option>{statuses.map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></div>
      <div style={{display:"grid",gap:10,marginTop:16}}>{visible.map(t=><button key={t.id} className="btn" style={{textAlign:"left",padding:14}} onClick={()=>loadMessages(t)}><strong>{t.ticket_number}</strong><br/><span>{t.subject}</span><br/><small>{t.customer?.full_name||t.customer?.email||"Customer"} · {t.status.replaceAll("_"," ")}</small></button>)}{!visible.length&&<p className="muted">No matching support tickets.</p>}</div>
     </div>
-    <div className="card">{!selected?<><h2>Conversation</h2><p className="muted">Select a ticket to review the customer request and reply.</p></>:<>
+    <div className="card support-conversation">{!selected?<><h2>Conversation</h2><p className="muted">Select a ticket to review the customer request and reply.</p></>:<>
      <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><div className="home-kicker">{selected.ticket_number}</div><h2>{selected.subject}</h2></div><span className="home-pill">{selected.status.replaceAll("_"," ")}</span></div>
      <p className="muted">{categoryLabels[selected.category]||selected.category} · {selected.customer?.full_name||"Customer"} · {selected.customer?.email||selected.customer?.phone||"Account user"}</p>
      {selected.assessment_id&&<p><a className="btn" href={"/assessments/"+selected.assessment_id}>View related assessment →</a></p>}
