@@ -32,7 +32,6 @@ Deno.serve(async(req:Request)=>{
 - Hidden/internal, mechanical, electrical, structural, ADAS, tyre/wheel, glass and interior issues are outside scope unless expressly stated.
 - Repair cost is approximate and varies by location, workshop, vehicle, parts and repair method.
 - The first eligible assessment is free. Later assessments are currently ₹199 each.
-- Assessment-related data is generally intended to remain available for up to 20 days; customers should save reports they need.
 - Customers receive support replies inside their CarFix account.
 - Never promise or approve a refund, payment change, data deletion, account/security action, assessment modification, compensation, or legal outcome.
 - Never invent account, assessment, payment or ticket status.
