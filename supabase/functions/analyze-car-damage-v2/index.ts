@@ -290,7 +290,7 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
 
     const rawResponse = openAIResult.raw;
 
-    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }>; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } };
     try {
       responsePayload = JSON.parse(rawResponse);
     } catch {
@@ -342,6 +342,20 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
       .eq("user_id", userId)
       .eq("status", "processing");
     if (completionError) throw new AppError(500, "analysis_failed", "Could not complete the assessment.");
+
+    if (analysisAttemptId) {
+      const { error: telemetryError } = await db.from("ai_analysis_attempts").update({
+        status: "completed",
+        provider_request_id: openAIResult.requestId ?? null,
+        provider_attempts: openAIResult.providerAttempts,
+        input_tokens: responsePayload.usage?.input_tokens ?? null,
+        output_tokens: responsePayload.usage?.output_tokens ?? null,
+        total_tokens: responsePayload.usage?.total_tokens ?? null,
+        latency_ms: openAIResult.latencyMs,
+        finished_at: new Date().toISOString(),
+      }).eq("id", analysisAttemptId);
+      if (telemetryError) console.error("Could not complete AI attempt telemetry", { assessmentId, message: telemetryError.message });
+    }
 
     lockAcquired = false;
     return reply({ success: true, scope: "car_body_repair_and_painting_only" });
