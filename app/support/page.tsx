@@ -24,13 +24,14 @@ export default function SupportPage(){
   const {data,error}=await supabase.from("support_tickets").select("id,ticket_number,category,subject,status,assessment_id,created_at,updated_at").eq("user_id",uid).order("created_at",{ascending:false});
   if(error) throw error; setTickets((data??[]) as Ticket[]);
  }
- useEffect(()=>{if(!selected||!userId)return;const timer=window.setInterval(async()=>{try{await Promise.all([openTicket(selected,true),loadTickets(userId)])}catch{}},5000);return()=>window.clearInterval(timer)},[selected?.id,userId,openTicket]);
  useEffect(()=>{(async()=>{try{
   const {data:{user}}=await supabase.auth.getUser(); if(!user){window.location.href="/login";return} setUserId(user.id);
   const [{data:ar,error:ae}]=await Promise.all([supabase.from("assessments").select("id,city,created_at").eq("user_id",user.id).order("created_at",{ascending:false})]);
   if(ae)throw ae; setAssessments((ar??[]) as Assessment[]); await loadTickets(user.id);
  }catch{setError("Could not load support. Please try again.")}finally{setLoading(false)}})()},[]);
  const openTicket=useCallback(async(t:Ticket,quiet=false)=>{setSelected(t);if(!quiet)setError("");const {data,error}=await supabase.from("support_messages").select("id,sender_type,message,created_at").eq("ticket_id",t.id).order("created_at",{ascending:true});if(error){if(!quiet)setError("Could not load this conversation.");return}setMessages((data??[]) as Message[])},[supabase]);
+ useEffect(()=>{if(!selected||!userId)return;const timer=window.setInterval(async()=>{try{await Promise.all([openTicket(selected,true),loadTickets(userId)])}catch{}},5000);return()=>window.clearInterval(timer)},[selected?.id,userId,openTicket]);
+
  async function askAssistant(e:FormEvent){e.preventDefault();if(!assistantQuestion.trim())return;setAssistantBusy(true);setAssistantAnswer("");setAssistantEscalate(false);setError("");try{
   const {data,error}=await supabase.functions.invoke("support-assistant",{body:{message:assistantQuestion.trim(),category}});if(error)throw error;
   if(data?.action==="answer")setAssistantAnswer(String(data.answer||""));else{setAssistantEscalate(true);setAssistantAnswer(String(data?.reason||"This request needs review by a CarFix support agent."));}
