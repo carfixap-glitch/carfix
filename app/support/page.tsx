@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 
 type Assessment = { id:string; city:string|null; created_at:string };
@@ -14,7 +14,7 @@ const categories=[
 const labels=Object.fromEntries(categories) as Record<string,string>;
 
 export default function SupportPage(){
- const supabase=useMemo(()=>createClient(),[]);
+ const supabase=useMemo(()=>createClient(),[]);\n const newTicketRef=useRef<HTMLFormElement|null>(null);\n const subjectRef=useRef<HTMLInputElement|null>(null);
  const [userId,setUserId]=useState(""),[tickets,setTickets]=useState<Ticket[]>([]),[assessments,setAssessments]=useState<Assessment[]>([]);
  const [selected,setSelected]=useState<Ticket|null>(null),[messages,setMessages]=useState<Message[]>([]);
  const [category,setCategory]=useState("assessment_issue"),[assessmentId,setAssessmentId]=useState(""),[subject,setSubject]=useState(""),[firstMessage,setFirstMessage]=useState("");
@@ -50,13 +50,13 @@ export default function SupportPage(){
   <section className="section"><div className="container">
    <div className="dashboard-list-heading"><div><div className="home-kicker">CUSTOMER SUPPORT</div><h1>Support & grievances</h1><p className="muted">Ask for help and receive replies securely inside your CarFix account.</p></div></div>
    {error&&<div className="card" style={{marginBottom:18}}><p>{error}</p></div>}
-   <form className="card support-assistant-card" onSubmit={askAssistant}><div className="home-kicker">CARFIX ASSISTANT</div><h2>Quick help</h2><p className="muted">Ask a simple question first. Payment actions, refunds, privacy/data requests, grievances and account-specific problems are sent to agent support.</p><label>Your question<textarea rows={3} maxLength={2000} required value={assistantQuestion} onChange={e=>setAssistantQuestion(e.target.value)} placeholder="Example: What does the AI assessment cover?"/></label><button className="btn primary" disabled={assistantBusy}>{assistantBusy?"Checking…":"Ask CarFix Assistant"}</button>{assistantAnswer&&<div style={{marginTop:14,padding:14,border:"1px solid rgba(128,128,128,.25)",borderRadius:12}}><strong>{assistantEscalate?"Agent assistance needed":"CarFix Assistant"}</strong><p style={{whiteSpace:"pre-wrap"}}>{assistantAnswer}</p>{assistantEscalate&&<button type="button" className="btn" onClick={()=>{setSubject(assistantQuestion.slice(0,160));setFirstMessage(assistantQuestion)}}>Use this question for a ticket</button>}</div>}</form>
+   <form className="card support-assistant-card" onSubmit={askAssistant}><div className="home-kicker">CARFIX ASSISTANT</div><h2>Quick help</h2><p className="muted">Ask a simple question first. Payment actions, refunds, privacy/data requests, grievances and account-specific problems are sent to agent support.</p><label>Your question<textarea rows={3} maxLength={2000} required value={assistantQuestion} onChange={e=>setAssistantQuestion(e.target.value)} placeholder="Example: What does the AI assessment cover?"/></label><button className="btn primary" disabled={assistantBusy}>{assistantBusy?"Checking…":"Ask CarFix Assistant"}</button>{assistantAnswer&&<div style={{marginTop:14,padding:14,border:"1px solid rgba(128,128,128,.25)",borderRadius:12}}><strong>{assistantEscalate?"Agent assistance needed":"CarFix Assistant"}</strong><p style={{whiteSpace:"pre-wrap"}}>{assistantAnswer}</p>{assistantEscalate&&<button type="button" className="btn" onClick={()=>{setSubject(assistantQuestion.slice(0,160));setFirstMessage(assistantQuestion);window.requestAnimationFrame(()=>{newTicketRef.current?.scrollIntoView({behavior:"smooth",block:"start"});subjectRef.current?.focus({preventScroll:true})})}}>Use this question for a ticket</button>}</div>}</form>
    <div className="support-grid">
     <div>
-     <form className="card" onSubmit={createTicket}><h2>New support request</h2>
+     <form ref={newTicketRef} className="card" onSubmit={createTicket}><h2>New support request</h2>
       <label>Category<select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
       <label>Related assessment (optional)<select value={assessmentId} onChange={e=>setAssessmentId(e.target.value)}><option value="">Not related to an assessment</option>{assessments.map(a=><option key={a.id} value={a.id}>{a.city||"Assessment"} · {new Date(a.created_at).toLocaleDateString("en-IN")}</option>)}</select></label>
-      <label>Subject<input maxLength={160} minLength={3} required value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Briefly describe the issue"/></label>
+      <label>Subject<input ref={subjectRef} maxLength={160} minLength={3} required value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Briefly describe the issue"/></label>
       <label>Message<textarea maxLength={5000} required rows={5} value={firstMessage} onChange={e=>setFirstMessage(e.target.value)} placeholder="Tell us how we can help."/></label>
       <button className="btn primary" disabled={saving}>{saving?"Sending…":"Create support request"}</button>
      </form>
