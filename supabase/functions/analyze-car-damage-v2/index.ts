@@ -338,6 +338,26 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
     lockAcquired = false;
     return reply({ success: true, scope: "car_body_repair_and_painting_only" });
   } catch (error) {
+    const appError = error instanceof AppError
+      ? error
+      : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
+
+    if (db && analysisAttemptId) {
+      const { error: attemptFailError } = await db
+        .from("ai_analysis_attempts")
+        .update({
+          status: appError.code === "openai_timeout" ? "timed_out" : "failed",
+          latency_ms: analysisStartedAt ? Date.now() - analysisStartedAt : null,
+          error_code: appError.code,
+          error_message: appError.message,
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", analysisAttemptId);
+      if (attemptFailError) {
+        console.error("Could not record AI attempt failure", { assessmentId, message: attemptFailError.message });
+      }
+    }
+
     if (lockAcquired && db && assessmentId && userId) {
       const { error: unlockError } = await db
         .from("assessments")
