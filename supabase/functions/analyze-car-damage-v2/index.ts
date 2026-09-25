@@ -347,7 +347,6 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
         output_tokens: providerResult.usage.outputTokens ?? null,
         total_tokens: providerResult.usage.totalTokens ?? null,
         latency_ms: providerResult.latencyMs,
-        error_code: providerResult.fallbackReason ? `fallback_from_openai:${providerResult.fallbackReason}` : null,
         finished_at: new Date().toISOString(),
       }).eq("id", analysisAttemptId);
       if (telemetryError) console.error("Could not complete AI attempt telemetry", { assessmentId, message: telemetryError.message });
