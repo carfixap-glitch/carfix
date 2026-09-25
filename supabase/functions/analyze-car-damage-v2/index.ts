@@ -100,13 +100,21 @@ function providerError(status: number, payload: OpenAIErrorPayload, requestId?: 
 
 async function callOpenAI(key: string, body: unknown) {
   const maxAttempts = 3;
-
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    let response: Response;\n    try {\n      response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new AppError(504, "openai_timeout", "AI analysis took too long. Please try again.", true);
+      }
+      throw error;
+    }
     const raw = await response.text();
     if (response.ok) return raw;
 
@@ -114,29 +122,15 @@ async function callOpenAI(key: string, body: unknown) {
     const requestId = response.headers.get("x-request-id") ?? undefined;
     const code = payload.error?.code ?? "";
     const isRetryable = (response.status === 429 && !nonRetryableQuotaCodes.has(code)) || response.status === 503;
-
-    console.error("OpenAI request failed", {
-      status: response.status,
-      code: code || null,
-      type: payload.error?.type ?? null,
-      requestId: requestId ?? null,
-      attempt: attempt + 1,
-      retryable: isRetryable,
-    });
-
-    if (!isRetryable || attempt === maxAttempts - 1) {
-      throw providerError(response.status, payload, requestId);
-    }
+    console.error("OpenAI request failed", { status: response.status, code: code || null, type: payload.error?.type ?? null, requestId: requestId ?? null, attempt: attempt + 1, retryable: isRetryable });
+    if (!isRetryable || attempt === maxAttempts - 1) throw providerError(response.status, payload, requestId);
 
     const retryAfter = response.headers.get("Retry-After");
     const parsedDelay = retryAfter ? Number(retryAfter) : Number.NaN;
-    const base = Number.isFinite(parsedDelay) && parsedDelay >= 0
-      ? parsedDelay * 1000
-      : 1000 * Math.pow(2, attempt);
+    const base = Number.isFinite(parsedDelay) && parsedDelay >= 0 ? parsedDelay * 1000 : 1000 * Math.pow(2, attempt);
     const jitter = Math.floor(Math.random() * 500);
     await new Promise((resolve) => setTimeout(resolve, Math.min(base + jitter, 15_000)));
   }
-
   throw new AppError(502, "analysis_failed", "The AI provider could not complete this assessment.");
 }
 
@@ -257,7 +251,7 @@ Do not double-count the same damage across photos. Give a range and explain unce
 Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown"} Year: ${vehicle?.year || "unknown"} City: ${assessment.city || "unknown"}
 `;
 
-    const { data: previousAttempts } = await db.from("ai_analysis_attempts").select("attempt_number").eq("assessment_id", assessmentId).order("attempt_number", { ascending: false }).limit(1);\n    const attemptNumber = (previousAttempts?.[0]?.attempt_number ?? 0) + 1;\n    analysisStartedAt = Date.now();\n    const { data: attemptRow, error: attemptCreateError } = await db.from("ai_analysis_attempts").insert({ assessment_id: assessmentId, user_id: userId, attempt_number: attemptNumber, status: "started", provider: "openai", model: "gpt-5.6-luna" }).select("id").single();\n    if (attemptCreateError || !attemptRow) throw new AppError(500, "analysis_failed", "Could not start AI attempt tracking.");\n    analysisAttemptId = attemptRow.id;\n\n    const openAIResult = await callOpenAI(openAIKey, {
+    const rawResponse = await callOpenAI(openAIKey, {
       model: "gpt-5.6-luna",
       input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images] }],
       text: { format: { type: "json_object" } },
