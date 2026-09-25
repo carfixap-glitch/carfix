@@ -97,7 +97,7 @@ export default function NewAssessmentPage() {
     if(ve){setBusy(false);setMessage("Could not save your vehicle details. Please try again.");return;}
 
     const {data:assessment,error:ae}=await supabase.from("assessments")
-      .insert({user_id:user.id,vehicle_id:vehicle.id,city:locationDetails.city || null,latitude:coords.latitude,longitude:coords.longitude,gps_accuracy:coords.accuracy,location_captured_at:new Date().toISOString(),address:locationDetails.address || null,state:locationDetails.state || null,pincode:locationDetails.pincode || null,country:locationDetails.country || null,status:"pending"})
+      .insert({user_id:user.id,vehicle_id:vehicle.id,city:locationDetails.city || locationDetails.address || "Current location",latitude:coords.latitude,longitude:coords.longitude,gps_accuracy:coords.accuracy,location_captured_at:new Date().toISOString(),address:locationDetails.address || null,state:locationDetails.state || null,pincode:locationDetails.pincode || null,country:locationDetails.country || null,status:"pending"})
       .select("id").single();
 
     if(ae){setBusy(false);setMessage("Could not create your assessment. Please try again.");return;}
