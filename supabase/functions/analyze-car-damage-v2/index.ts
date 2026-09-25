@@ -98,7 +98,7 @@ function providerError(status: number, payload: OpenAIErrorPayload, requestId?: 
   return new AppError(502, "analysis_failed", "The AI provider could not complete this assessment.", false, requestId);
 }
 
-async function callOpenAI(key: string, body: unknown) {
+type OpenAIResult = { raw: string; requestId?: string; providerAttempts: number; latencyMs: number };\n\nasync function callOpenAI(key: string, body: unknown): Promise<OpenAIResult> {\n  const startedAt = Date.now();
   const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let response: Response;
@@ -116,7 +116,7 @@ async function callOpenAI(key: string, body: unknown) {
       throw error;
     }
     const raw = await response.text();
-    if (response.ok) return raw;
+    if (response.ok) return { raw, requestId: response.headers.get("x-request-id") ?? undefined, providerAttempts: attempt + 1, latencyMs: Date.now() - startedAt };
 
     const payload = parseOpenAIError(raw);
     const requestId = response.headers.get("x-request-id") ?? undefined;
@@ -251,13 +251,13 @@ Do not double-count the same damage across photos. Give a range and explain unce
 Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown"} Year: ${vehicle?.year || "unknown"} City: ${assessment.city || "unknown"}
 `;
 
-    const rawResponse = await callOpenAI(openAIKey, {
+    const openAIResult = await callOpenAI(openAIKey, {
       model: "gpt-5.6-luna",
       input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images] }],
       text: { format: { type: "json_object" } },
     });
 
-    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+    const rawResponse = openAIResult.raw;\n\n    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
     try {
       responsePayload = JSON.parse(rawResponse);
     } catch {
