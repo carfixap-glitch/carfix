@@ -14,7 +14,9 @@ const categories=[
 const labels=Object.fromEntries(categories) as Record<string,string>;
 
 export default function SupportPage(){
- const supabase=useMemo(()=>createClient(),[]);\n const newTicketRef=useRef<HTMLFormElement|null>(null);\n const subjectRef=useRef<HTMLInputElement|null>(null);
+ const supabase=useMemo(()=>createClient(),[]);
+ const newTicketRef=useRef<HTMLFormElement|null>(null);
+ const subjectRef=useRef<HTMLInputElement|null>(null);
  const [userId,setUserId]=useState(""),[tickets,setTickets]=useState<Ticket[]>([]),[assessments,setAssessments]=useState<Assessment[]>([]);
  const [selected,setSelected]=useState<Ticket|null>(null),[messages,setMessages]=useState<Message[]>([]);
  const [category,setCategory]=useState("assessment_issue"),[assessmentId,setAssessmentId]=useState(""),[subject,setSubject]=useState(""),[firstMessage,setFirstMessage]=useState("");
