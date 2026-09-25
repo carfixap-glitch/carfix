@@ -52,7 +52,7 @@ export default function NewAssessmentPage() {
         setCoords(next);
         setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Looking up address…`);
         fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${next.latitude}&longitude=${next.longitude}&localityLanguage=en`)
-          .then(response=>response.ok ? response.json() : Promise.reject(new Error("Reverse geocoding failed")))
+          .then(response=>{if(!response.ok){console.warn("CarFix reverse geocode failed",{status:response.status,statusText:response.statusText});throw new Error(`Reverse geocoding failed (${response.status})`);}return response.json();})
           .then(data=>{
             const details={
               address:data.locality || data.localityInfo?.informative?.[0]?.name || "",
@@ -64,7 +64,7 @@ export default function NewAssessmentPage() {
             setLocationDetails(details);
             setLocationStatus(`Location captured${details.city ? ` — ${details.city}` : ""} (accuracy ~${Math.round(next.accuracy)} m).`);
           })
-          .catch(()=>setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Address lookup unavailable.`));
+          .catch(error=>{console.warn("CarFix reverse geocode unavailable",{message:error instanceof Error ? error.message : "Unknown lookup error"});setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Address lookup unavailable.`);});
       },
       error=>{
         setCoords(null);
