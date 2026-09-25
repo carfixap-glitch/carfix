@@ -132,7 +132,7 @@ export default function Home() {
       </section>
 
       <footer className="home-footer">
-        <div className="container"><a className="home-logo" href="/"><span>Car</span>Fix<span className="home-logo-dot">.</span></a><p>AI-assisted vehicle damage assessment.</p><span>© {new Date().getFullYear()} CarFix</span></div>
+        <div className="container"><a className="home-logo" href="/"><span>Car</span>Fix<span className="home-logo-dot">.</span></a><p>AI-assisted vehicle damage assessment.</p><nav className="home-legal-links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/ai-disclaimer">AI Disclaimer</a></nav><span>© {new Date().getFullYear()} CarFix</span></div>
       </footer>
     </main>
   );

@@ -183,3 +183,14 @@ main.section>.container[style*="max-width:520px"]>a,main.section>.container[styl
 .failure-card{width:min(600px,100%);padding:38px;border:1px solid rgba(255,255,255,.13);border-radius:24px;background:rgba(255,255,255,.055);box-shadow:0 35px 90px rgba(0,0,0,.3);text-align:center}
 .failure-kicker{font-size:10px;letter-spacing:1.8px;color:#60a5fa;font-weight:900}.failure-card h1{font-size:clamp(34px,6vw,52px);letter-spacing:-2px;margin:14px 0}.failure-card p{max-width:470px;margin:0 auto;color:#aeb9ca;line-height:1.65}.failure-card code{display:inline-block;margin-top:18px;padding:8px 11px;border-radius:8px;background:rgba(255,255,255,.07);color:#cbd5e1;font-size:11px}.failure-actions{display:flex;justify-content:center;gap:10px;margin-top:24px}.failure-actions button{cursor:pointer;font:inherit}.failure-actions .btn:not(.primary){color:#fff;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15)}
 @media(max-width:520px){.failure-card{padding:28px 20px}.failure-actions{flex-direction:column}.failure-actions .btn{width:100%}}
+
+
+/* Phase 8 legal pages */
+.legal-page{min-height:100vh;background:#07111f;padding:56px 20px;color:#dbe7f3}
+.legal-card{max-width:880px;margin:0 auto;background:rgba(13,27,45,.92);border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:44px;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.legal-logo{display:inline-block;color:#fff;font-size:24px;font-weight:800;text-decoration:none;margin-bottom:30px}.legal-logo span{color:#42d6b5}
+.legal-kicker{font-size:12px;font-weight:800;letter-spacing:.16em;color:#42d6b5;margin:0 0 8px}.legal-card h1{font-size:42px;line-height:1.1;color:#fff;margin:0 0 8px}.legal-updated{color:#8fa4ba;font-size:14px;margin-bottom:32px}
+.legal-card h2{font-size:20px;color:#fff;margin:30px 0 9px}.legal-card p{line-height:1.75;color:#bdcada}.legal-card strong{color:#fff}
+.legal-links{display:flex;flex-wrap:wrap;gap:18px;margin-top:38px;padding-top:24px;border-top:1px solid rgba(255,255,255,.09)}.legal-links a,.home-legal-links a,.auth-consent a{color:#42d6b5;text-decoration:none}.legal-links a:hover,.home-legal-links a:hover,.auth-consent a:hover{text-decoration:underline}
+.home-legal-links{display:flex;gap:16px;flex-wrap:wrap}.auth-consent{font-size:12px;line-height:1.55;color:#8296aa;margin:2px 0 4px}
+@media(max-width:640px){.legal-page{padding:24px 12px}.legal-card{padding:28px 20px;border-radius:18px}.legal-card h1{font-size:32px}.home-legal-links{justify-content:center}}
