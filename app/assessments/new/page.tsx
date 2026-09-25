@@ -18,7 +18,8 @@ export default function NewAssessmentPage() {
   const [locationDetails,setLocationDetails]=useState<{address:string;city:string;state:string;pincode:string;country:string}>({address:"",city:"",state:"",pincode:"",country:""});
   const [photos,setPhotos]=useState<File[]>([]);
   const [message,setMessage]=useState("");
-  const [busy,setBusy]=useState(false);\n  const [consent,setConsent]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [consent,setConsent]=useState(false);
   const input=useRef<HTMLInputElement>(null);
   const supabase=createClient();
 
@@ -81,7 +82,8 @@ export default function NewAssessmentPage() {
     e.preventDefault();
     if(!make || !model){setMessage("Please select the car make and model.");return;}
     if(!photos.length){setMessage("Please add at least one damage photo.");return;}
-    if(!coords){setMessage("Please allow location access so we can capture your current GPS location.");getCurrentLocation();return;}\n    if(!consent){setMessage("Please confirm the assessment consent before continuing.");return;}
+    if(!coords){setMessage("Please allow location access so we can capture your current GPS location.");getCurrentLocation();return;}
+    if(!consent){setMessage("Please confirm the assessment consent before continuing.");return;}
     setBusy(true);
     setMessage("Saving assessment…");
 
