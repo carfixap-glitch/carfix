@@ -110,7 +110,7 @@ export default function AdminPage() {
   const pending = rows.filter((r) => r.status === "pending" || r.status === "processing").length;
 
   return <main>
-    <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}><div className="brand"><span>Car</span>Fix. <small style={{fontSize:11,color:"#667085"}}>ADMIN</small></div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><a className="btn" href="/admin/payments">Payments</a><a className="btn" href="/admin/customers">Customers</a><a className="btn" href="/admin/manual-assessments">Manual assessments</a><button className="btn" onClick={logout}>Sign out</button></div></div></header>
+    <header className="nav"><div className="container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}><div className="brand"><span>Car</span>Fix. <small style={{fontSize:11,color:"#667085"}}>ADMIN</small></div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><a className="btn" href="/admin/support">Support</a><a className="btn" href="/admin/payments">Payments</a><a className="btn" href="/admin/customers">Customers</a><a className="btn" href="/admin/manual-assessments">Manual assessments</a><button className="btn" onClick={logout}>Sign out</button></div></div></header>
     <section className="section"><div className="container">
       <div className="admin-hero"><div style={{position:"relative",zIndex:1}}><div className="home-kicker">CARFIX CONTROL CENTER</div><h1>Everything in view.</h1><p>Monitor customer assessments, AI reports and manual workshop assessments from one workspace.</p></div></div>
       {error&&<div className="card" style={{marginTop:20}}><p>{error}</p></div>}
