@@ -32,21 +32,7 @@ create index if not exists ai_analysis_attempts_status_started_idx
 
 alter table public.ai_analysis_attempts enable row level security;
 
--- Customers may read telemetry only for assessments they own.
-create policy "Customers can read own AI attempts"
-on public.ai_analysis_attempts
-for select
-to authenticated
-using (
-  (select auth.uid()) = user_id
-  and exists (
-    select 1
-    from public.assessments a
-    where a.id = ai_analysis_attempts.assessment_id
-      and a.user_id = (select auth.uid())
-  )
-);
-
--- Writes are intentionally server-only through the Edge Function secret key.
-revoke insert, update, delete on public.ai_analysis_attempts from anon, authenticated;
-grant select on public.ai_analysis_attempts to authenticated;
+-- Operational telemetry is server/admin-internal. No browser role receives table access.
+-- Edge Functions using the service-role client can write/read this table while RLS
+-- continues to deny direct anon/authenticated access.
+revoke all on public.ai_analysis_attempts from anon, authenticated;
