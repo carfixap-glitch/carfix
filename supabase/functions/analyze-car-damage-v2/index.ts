@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
   let assessmentId = "";
   let userId = "";
   let lockAcquired = false;
-  let db: ReturnType<typeof createClient> | null = null;\n  let analysisAttemptId = "";\n  let analysisStartedAt = 0;
+  let db: ReturnType<typeof createClient> | null = null;\n  let analysisAttemptId = "";\n  let analysisStartedAt = 0;\n  let analysisAttemptId = "";\n  let analysisStartedAt = 0;
 
   try {
     const auth = req.headers.get("Authorization");
@@ -251,6 +251,31 @@ Do not double-count the same damage across photos. Give a range and explain unce
 Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown"} Year: ${vehicle?.year || "unknown"} City: ${assessment.city || "unknown"}
 `;
 
+    const { data: previousAttempts, error: previousAttemptsError } = await db
+      .from("ai_analysis_attempts")
+      .select("attempt_number")
+      .eq("assessment_id", assessmentId)
+      .order("attempt_number", { ascending: false })
+      .limit(1);
+    if (previousAttemptsError) throw new AppError(500, "analysis_failed", "Could not prepare AI attempt tracking.");
+
+    const attemptNumber = (previousAttempts?.[0]?.attempt_number ?? 0) + 1;
+    analysisStartedAt = Date.now();
+    const { data: attemptRow, error: attemptCreateError } = await db
+      .from("ai_analysis_attempts")
+      .insert({
+        assessment_id: assessmentId,
+        user_id: userId,
+        attempt_number: attemptNumber,
+        status: "started",
+        provider: "openai",
+        model: "gpt-5.6-luna",
+      })
+      .select("id")
+      .single();
+    if (attemptCreateError || !attemptRow) throw new AppError(500, "analysis_failed", "Could not start AI attempt tracking.");
+    analysisAttemptId = attemptRow.id;
+
     const openAIResult = await callOpenAI(openAIKey, {
       model: "gpt-5.6-luna",
       input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images] }],
@@ -323,9 +348,6 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
       if (unlockError) console.error("Could not release analysis lock", { assessmentId, message: unlockError.message });
     }
 
-    const appError = error instanceof AppError
-      ? error
-      : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
     console.error("CarFix analysis failed", {
       assessmentId: assessmentId || null,
       status: appError.status,
