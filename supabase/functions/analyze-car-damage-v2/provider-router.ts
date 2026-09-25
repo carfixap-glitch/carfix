@@ -126,7 +126,7 @@ async function callOpenAI(key: string, prompt: string, imageUrls: string[]): Pro
   }
 
   const raw = await response.text();
-  if (!response.ok) throw openAIError(response, raw);
+  if (!response.ok) throw openAIError(response, raw).error;
 
   const payload = parseJson(raw);
   const outputText = payload?.output
