@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { ProviderRouterError, runAssessmentWithFallback, selectAssessmentProvider } from "./provider-router.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -212,6 +213,12 @@ Deno.serve(async (req: Request) => {
       throw new AppError(409, "analysis_failed", "A cancelled assessment cannot be analyzed.");
     }
 
+    // Check provider readiness before the assessment enters processing.
+    const openAIKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    const geminiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    if (!openAIKey && !geminiKey) throw new AppError(500, "configuration_error", "AI analysis is not configured correctly.");
+    const providerSelection = await selectAssessmentProvider(openAIKey, geminiKey);
+
     const { data: locked, error: lockError } = await db
       .from("assessments")
       .update({ status: "processing", updated_at: new Date().toISOString() })
@@ -240,9 +247,6 @@ Deno.serve(async (req: Request) => {
     }));
     const images = signedImages.filter((image): image is { type: string; image_url: string } => image !== null);
     if (!images.length) throw new AppError(500, "analysis_failed", "Could not securely access the uploaded photos.");
-
-    const openAIKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openAIKey) throw new AppError(500, "configuration_error", "AI analysis is not configured correctly.");
 
     const vehicle = Array.isArray(assessment.vehicles) ? assessment.vehicles[0] : assessment.vehicles;
     const prompt = `
@@ -274,36 +278,25 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
         user_id: userId,
         attempt_number: attemptNumber,
         status: "started",
-        provider: "openai",
-        model: "gpt-5.6-luna",
+        provider: providerSelection.provider,
+        model: providerSelection.model,
       })
       .select("id")
       .single();
     if (attemptCreateError || !attemptRow) throw new AppError(500, "analysis_failed", "Could not start AI attempt tracking.");
     analysisAttemptId = attemptRow.id;
 
-    const openAIResult = await callOpenAI(openAIKey, {
-      model: "gpt-5.6-luna",
-      input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images] }],
-      text: { format: { type: "json_object" } },
+    const providerResult = await runAssessmentWithFallback({
+      selection: providerSelection,
+      openAIKey,
+      geminiKey,
+      prompt,
+      imageUrls: images.map((image) => image.image_url),
     });
-
-    const rawResponse = openAIResult.raw;
-
-    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }>; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } };
-    try {
-      responsePayload = JSON.parse(rawResponse);
-    } catch {
-      throw new AppError(502, "analysis_failed", "The AI provider returned an invalid response.");
-    }
-    const outputText = responsePayload.output
-      ?.flatMap((item) => item.content ?? [])
-      .find((item) => item.type === "output_text")?.text;
-    if (!outputText) throw new AppError(502, "analysis_failed", "The AI provider returned no analysis.");
 
     let analysis: Record<string, unknown>;
     try {
-      analysis = JSON.parse(outputText);
+      analysis = JSON.parse(providerResult.outputText);
     } catch {
       throw new AppError(502, "analysis_failed", "The AI provider returned an invalid assessment.");
     }
@@ -346,12 +339,15 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
     if (analysisAttemptId) {
       const { error: telemetryError } = await db.from("ai_analysis_attempts").update({
         status: "completed",
-        provider_request_id: openAIResult.requestId ?? null,
-        provider_attempts: openAIResult.providerAttempts,
-        input_tokens: responsePayload.usage?.input_tokens ?? null,
-        output_tokens: responsePayload.usage?.output_tokens ?? null,
-        total_tokens: responsePayload.usage?.total_tokens ?? null,
-        latency_ms: openAIResult.latencyMs,
+        provider: providerResult.provider,
+        model: providerResult.model,
+        provider_request_id: providerResult.requestId ?? null,
+        provider_attempts: providerResult.providerAttempts,
+        input_tokens: providerResult.usage.inputTokens ?? null,
+        output_tokens: providerResult.usage.outputTokens ?? null,
+        total_tokens: providerResult.usage.totalTokens ?? null,
+        latency_ms: providerResult.latencyMs,
+        error_code: providerResult.fallbackReason ? `fallback_from_openai:${providerResult.fallbackReason}` : null,
         finished_at: new Date().toISOString(),
       }).eq("id", analysisAttemptId);
       if (telemetryError) console.error("Could not complete AI attempt telemetry", { assessmentId, message: telemetryError.message });
@@ -360,17 +356,21 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
     lockAcquired = false;
     return reply({ success: true, scope: "car_body_repair_and_painting_only" });
   } catch (error) {
+    const providerFailure = error instanceof ProviderRouterError ? error : null;
     const appError = error instanceof AppError
       ? error
-      : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
+      : providerFailure
+        ? new AppError(providerFailure.status, "analysis_failed", providerFailure.message, providerFailure.retryable, providerFailure.requestId)
+        : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
 
     if (db && analysisAttemptId) {
       const { error: attemptFailError } = await db
         .from("ai_analysis_attempts")
         .update({
-          status: appError.code === "openai_timeout" ? "timed_out" : "failed",
+          status: providerFailure?.code?.includes("timeout") || appError.code === "openai_timeout" ? "timed_out" : "failed",
+          provider: providerFailure?.provider ?? undefined,
           latency_ms: analysisStartedAt ? Date.now() - analysisStartedAt : null,
-          error_code: appError.code,
+          error_code: providerFailure?.code ?? appError.code,
           error_message: appError.message,
           finished_at: new Date().toISOString(),
         })
