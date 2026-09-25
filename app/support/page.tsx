@@ -18,7 +18,7 @@ export default function SupportPage(){
  const [userId,setUserId]=useState(""),[tickets,setTickets]=useState<Ticket[]>([]),[assessments,setAssessments]=useState<Assessment[]>([]);
  const [selected,setSelected]=useState<Ticket|null>(null),[messages,setMessages]=useState<Message[]>([]);
  const [category,setCategory]=useState("assessment_issue"),[assessmentId,setAssessmentId]=useState(""),[subject,setSubject]=useState(""),[firstMessage,setFirstMessage]=useState("");
- const [reply,setReply]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState("");
+ const [reply,setReply]=useState(""),[assistantQuestion,setAssistantQuestion]=useState(""),[assistantAnswer,setAssistantAnswer]=useState(""),[assistantEscalate,setAssistantEscalate]=useState(false),[assistantBusy,setAssistantBusy]=useState(false),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState("");
 
  async function loadTickets(uid:string){
   const {data,error}=await supabase.from("support_tickets").select("id,ticket_number,category,subject,status,assessment_id,created_at,updated_at").eq("user_id",uid).order("created_at",{ascending:false});
@@ -30,6 +30,10 @@ export default function SupportPage(){
   if(ae)throw ae; setAssessments((ar??[]) as Assessment[]); await loadTickets(user.id);
  }catch{setError("Could not load support. Please try again.")}finally{setLoading(false)}})()},[]);
  async function openTicket(t:Ticket){setSelected(t);setError("");const {data,error}=await supabase.from("support_messages").select("id,sender_type,message,created_at").eq("ticket_id",t.id).order("created_at",{ascending:true});if(error){setError("Could not load this conversation.");return}setMessages((data??[]) as Message[])}
+ async function askAssistant(e:FormEvent){e.preventDefault();if(!assistantQuestion.trim())return;setAssistantBusy(true);setAssistantAnswer("");setAssistantEscalate(false);setError("");try{
+  const {data,error}=await supabase.functions.invoke("support-assistant",{body:{message:assistantQuestion.trim(),category}});if(error)throw error;
+  if(data?.action==="answer")setAssistantAnswer(String(data.answer||""));else{setAssistantEscalate(true);setAssistantAnswer(String(data?.reason||"This request needs review by CarFix Support."));}
+ }catch{setAssistantEscalate(true);setAssistantAnswer("The assistant could not safely answer this request. Please create a support ticket below.")}finally{setAssistantBusy(false)}}
  async function createTicket(e:FormEvent){e.preventDefault();if(!userId||subject.trim().length<3||!firstMessage.trim())return;setSaving(true);setError("");try{
   const {data:t,error:te}=await supabase.from("support_tickets").insert({user_id:userId,assessment_id:assessmentId||null,category,subject:subject.trim(),status:"open"}).select("id,ticket_number,category,subject,status,assessment_id,created_at,updated_at").single();if(te)throw te;
   const {error:me}=await supabase.from("support_messages").insert({ticket_id:t.id,sender_type:"customer",sender_user_id:userId,message:firstMessage.trim()});if(me)throw me;
@@ -44,6 +48,7 @@ export default function SupportPage(){
   <section className="section"><div className="container">
    <div className="dashboard-list-heading"><div><div className="home-kicker">CUSTOMER SUPPORT</div><h1>Support & grievances</h1><p className="muted">Ask for help and receive replies securely inside your CarFix account.</p></div></div>
    {error&&<div className="card" style={{marginBottom:18}}><p>{error}</p></div>}
+   <form className="card" onSubmit={askAssistant} style={{marginBottom:20}}><div className="home-kicker">CARFIX ASSISTANT</div><h2>Quick help</h2><p className="muted">Ask a simple question first. Payment actions, refunds, privacy/data requests, grievances and account-specific problems are sent to human support.</p><label>Your question<textarea rows={3} maxLength={2000} required value={assistantQuestion} onChange={e=>setAssistantQuestion(e.target.value)} placeholder="Example: What does the AI assessment cover?"/></label><button className="btn primary" disabled={assistantBusy}>{assistantBusy?"Checking…":"Ask CarFix Assistant"}</button>{assistantAnswer&&<div style={{marginTop:14,padding:14,border:"1px solid rgba(128,128,128,.25)",borderRadius:12}}><strong>{assistantEscalate?"Human support needed":"CarFix Assistant"}</strong><p style={{whiteSpace:"pre-wrap"}}>{assistantAnswer}</p>{assistantEscalate&&<button type="button" className="btn" onClick={()=>{setSubject(assistantQuestion.slice(0,160));setFirstMessage(assistantQuestion)}}>Use this question for a ticket</button>}</div>}</form>
    <div style={{display:"grid",gridTemplateColumns:"minmax(280px,1fr) minmax(320px,1.4fr)",gap:20,alignItems:"start"}}>
     <div>
      <form className="card" onSubmit={createTicket}><h2>New support request</h2>
