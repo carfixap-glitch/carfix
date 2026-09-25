@@ -19,6 +19,7 @@ type ErrorCode =
   | "openai_usage_limit"
   | "openai_rate_limit"
   | "openai_unavailable"
+  | "openai_timeout"
   | "configuration_error"
   | "analysis_failed";
 
@@ -98,45 +99,42 @@ function providerError(status: number, payload: OpenAIErrorPayload, requestId?: 
   return new AppError(502, "analysis_failed", "The AI provider could not complete this assessment.", false, requestId);
 }
 
-async function callOpenAI(key: string, body: unknown) {
-  const maxAttempts = 3;
+type OpenAIResult = { raw: string; requestId?: string; providerAttempts: number; latencyMs: number };
 
+async function callOpenAI(key: string, body: unknown): Promise<OpenAIResult> {
+  const startedAt = Date.now();
+  const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new AppError(504, "openai_timeout", "AI analysis took too long. Please try again.", true);
+      }
+      throw error;
+    }
     const raw = await response.text();
-    if (response.ok) return raw;
+    if (response.ok) return { raw, requestId: response.headers.get("x-request-id") ?? undefined, providerAttempts: attempt + 1, latencyMs: Date.now() - startedAt };
 
     const payload = parseOpenAIError(raw);
     const requestId = response.headers.get("x-request-id") ?? undefined;
     const code = payload.error?.code ?? "";
     const isRetryable = (response.status === 429 && !nonRetryableQuotaCodes.has(code)) || response.status === 503;
-
-    console.error("OpenAI request failed", {
-      status: response.status,
-      code: code || null,
-      type: payload.error?.type ?? null,
-      requestId: requestId ?? null,
-      attempt: attempt + 1,
-      retryable: isRetryable,
-    });
-
-    if (!isRetryable || attempt === maxAttempts - 1) {
-      throw providerError(response.status, payload, requestId);
-    }
+    console.error("OpenAI request failed", { status: response.status, code: code || null, type: payload.error?.type ?? null, requestId: requestId ?? null, attempt: attempt + 1, retryable: isRetryable });
+    if (!isRetryable || attempt === maxAttempts - 1) throw providerError(response.status, payload, requestId);
 
     const retryAfter = response.headers.get("Retry-After");
     const parsedDelay = retryAfter ? Number(retryAfter) : Number.NaN;
-    const base = Number.isFinite(parsedDelay) && parsedDelay >= 0
-      ? parsedDelay * 1000
-      : 1000 * Math.pow(2, attempt);
+    const base = Number.isFinite(parsedDelay) && parsedDelay >= 0 ? parsedDelay * 1000 : 1000 * Math.pow(2, attempt);
     const jitter = Math.floor(Math.random() * 500);
     await new Promise((resolve) => setTimeout(resolve, Math.min(base + jitter, 15_000)));
   }
-
   throw new AppError(502, "analysis_failed", "The AI provider could not complete this assessment.");
 }
 
@@ -148,6 +146,8 @@ Deno.serve(async (req: Request) => {
   let userId = "";
   let lockAcquired = false;
   let db: ReturnType<typeof createClient> | null = null;
+  let analysisAttemptId = "";
+  let analysisStartedAt = 0;
 
   try {
     const auth = req.headers.get("Authorization");
@@ -257,13 +257,40 @@ Do not double-count the same damage across photos. Give a range and explain unce
 Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown"} Year: ${vehicle?.year || "unknown"} City: ${assessment.city || "unknown"}
 `;
 
-    const rawResponse = await callOpenAI(openAIKey, {
+    const { data: previousAttempts, error: previousAttemptsError } = await db
+      .from("ai_analysis_attempts")
+      .select("attempt_number")
+      .eq("assessment_id", assessmentId)
+      .order("attempt_number", { ascending: false })
+      .limit(1);
+    if (previousAttemptsError) throw new AppError(500, "analysis_failed", "Could not prepare AI attempt tracking.");
+
+    const attemptNumber = (previousAttempts?.[0]?.attempt_number ?? 0) + 1;
+    analysisStartedAt = Date.now();
+    const { data: attemptRow, error: attemptCreateError } = await db
+      .from("ai_analysis_attempts")
+      .insert({
+        assessment_id: assessmentId,
+        user_id: userId,
+        attempt_number: attemptNumber,
+        status: "started",
+        provider: "openai",
+        model: "gpt-5.6-luna",
+      })
+      .select("id")
+      .single();
+    if (attemptCreateError || !attemptRow) throw new AppError(500, "analysis_failed", "Could not start AI attempt tracking.");
+    analysisAttemptId = attemptRow.id;
+
+    const openAIResult = await callOpenAI(openAIKey, {
       model: "gpt-5.6-luna",
       input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images] }],
       text: { format: { type: "json_object" } },
     });
 
-    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+    const rawResponse = openAIResult.raw;
+
+    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }>; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } };
     try {
       responsePayload = JSON.parse(rawResponse);
     } catch {
@@ -316,9 +343,43 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
       .eq("status", "processing");
     if (completionError) throw new AppError(500, "analysis_failed", "Could not complete the assessment.");
 
+    if (analysisAttemptId) {
+      const { error: telemetryError } = await db.from("ai_analysis_attempts").update({
+        status: "completed",
+        provider_request_id: openAIResult.requestId ?? null,
+        provider_attempts: openAIResult.providerAttempts,
+        input_tokens: responsePayload.usage?.input_tokens ?? null,
+        output_tokens: responsePayload.usage?.output_tokens ?? null,
+        total_tokens: responsePayload.usage?.total_tokens ?? null,
+        latency_ms: openAIResult.latencyMs,
+        finished_at: new Date().toISOString(),
+      }).eq("id", analysisAttemptId);
+      if (telemetryError) console.error("Could not complete AI attempt telemetry", { assessmentId, message: telemetryError.message });
+    }
+
     lockAcquired = false;
     return reply({ success: true, scope: "car_body_repair_and_painting_only" });
   } catch (error) {
+    const appError = error instanceof AppError
+      ? error
+      : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
+
+    if (db && analysisAttemptId) {
+      const { error: attemptFailError } = await db
+        .from("ai_analysis_attempts")
+        .update({
+          status: appError.code === "openai_timeout" ? "timed_out" : "failed",
+          latency_ms: analysisStartedAt ? Date.now() - analysisStartedAt : null,
+          error_code: appError.code,
+          error_message: appError.message,
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", analysisAttemptId);
+      if (attemptFailError) {
+        console.error("Could not record AI attempt failure", { assessmentId, message: attemptFailError.message });
+      }
+    }
+
     if (lockAcquired && db && assessmentId && userId) {
       const { error: unlockError } = await db
         .from("assessments")
@@ -329,9 +390,6 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
       if (unlockError) console.error("Could not release analysis lock", { assessmentId, message: unlockError.message });
     }
 
-    const appError = error instanceof AppError
-      ? error
-      : new AppError(500, "analysis_failed", "AI analysis failed unexpectedly.");
     console.error("CarFix analysis failed", {
       assessmentId: assessmentId || null,
       status: appError.status,

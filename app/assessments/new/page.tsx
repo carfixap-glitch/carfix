@@ -9,6 +9,30 @@ const makes = Object.keys(carModels);
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_DIMENSION = 3200;
+const JPEG_QUALITY = 0.82;
+
+async function preparePhoto(file: File): Promise<File> {
+  if(!ACCEPTED_PHOTO_TYPES.has(file.type)) throw new Error(`${file.name} is not supported. Use JPG, PNG or WebP.`);
+  if(file.size>MAX_PHOTO_BYTES) throw new Error(`${file.name} is larger than 10 MB. Please choose a smaller photo.`);
+
+  let bitmap: ImageBitmap;
+  try { bitmap = await createImageBitmap(file); } catch { throw new Error(`${file.name} could not be read as a valid image. Please choose another photo.`); }
+  try {
+    if(bitmap.width<1 || bitmap.height<1) throw new Error(`${file.name} is not a valid image.`);
+    const scale=Math.min(1,MAX_IMAGE_DIMENSION/Math.max(bitmap.width,bitmap.height));
+    const width=Math.max(1,Math.round(bitmap.width*scale));
+    const height=Math.max(1,Math.round(bitmap.height*scale));
+    const canvas=document.createElement("canvas"); canvas.width=width; canvas.height=height;
+    const context=canvas.getContext("2d"); if(!context) throw new Error("This browser could not prepare the photo.");
+    context.drawImage(bitmap,0,0,width,height);
+    const blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/jpeg",JPEG_QUALITY));
+    if(!blob) throw new Error(`${file.name} could not be prepared for upload.`);
+    if(blob.size>MAX_PHOTO_BYTES) throw new Error(`${file.name} is still too large after preparation. Please choose a smaller photo.`);
+    const base=file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9._-]/g,"_") || "damage-photo";
+    return new File([blob],`${base}.jpg`,{type:"image/jpeg",lastModified:file.lastModified});
+  } finally { bitmap.close(); }
+}
 
 export default function NewAssessmentPage() {
   const [make,setMake]=useState("");
@@ -147,7 +171,7 @@ export default function NewAssessmentPage() {
           <div className="form-section-title" style={{marginTop:34}}><span>02</span><div><h2>Current location</h2><p className="muted">We'll securely capture your GPS location for this assessment.</p></div></div>
           <div className={`location-card ${coords?"captured":""}`}><div className="location-icon">⌖</div><div><strong>{coords?"Location captured":"Location required"}</strong><p>{locationStatus}</p>{coords&&locationDetails.address&&<small>{locationDetails.address}{locationDetails.city?`, ${locationDetails.city}`:""}{locationDetails.state?`, ${locationDetails.state}`:""}{locationDetails.pincode?` — ${locationDetails.pincode}`:""}</small>}</div>{!coords&&<button type="button" className="btn" onClick={getCurrentLocation}>Use my location</button>}</div>
           <div className="form-section-title" style={{marginTop:34}}><span>03</span><div><h2>Damage photos</h2><p className="muted">Use different angles. Up to 10 clear photos.</p></div></div>
-          <div className="photo-drop" onClick={()=>input.current?.click()} role="button" tabIndex={0} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();input.current?.click();}}}><div className="upload-icon">↑</div><strong>Upload damage photos</strong><span>JPG, PNG or WebP · Maximum 10 MB each</span><button type="button" className="btn" onClick={(e)=>{e.stopPropagation();input.current?.click()}}>Choose photos</button><input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>addPhotos(e.target.files)}/></div>
+          <div className="photo-drop" onClick={()=>input.current?.click()} role="button" tabIndex={0} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();input.current?.click();}}}><div className="upload-icon">↑</div><strong>Upload damage photos</strong><span>JPG, PNG or WebP · Maximum 10 MB each · Large images are optimized before upload</span><button type="button" className="btn" onClick={(e)=>{e.stopPropagation();input.current?.click()}}>Choose photos</button><input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void addPhotos(e.target.files)}}/></div>
           {photos.length>0&&<div className="photo-list">{photos.map((p,i)=><div key={`${p.name}-${p.size}`}><span>✓</span><strong>{p.name}</strong><small>{(p.size/1024/1024).toFixed(1)} MB</small><button type="button" onClick={()=>removePhoto(i)} aria-label={`Remove ${p.name}`}>Remove</button></div>)}</div>}
           {message&&<div className="form-message" role="status" aria-live="polite">{message}</div>}
         </div>
