@@ -18,7 +18,7 @@ export default function NewAssessmentPage() {
   const [locationDetails,setLocationDetails]=useState<{address:string;city:string;state:string;pincode:string;country:string}>({address:"",city:"",state:"",pincode:"",country:""});
   const [photos,setPhotos]=useState<File[]>([]);
   const [message,setMessage]=useState("");
-  const [busy,setBusy]=useState(false);
+  const [busy,setBusy]=useState(false);\n  const [consent,setConsent]=useState(false);
   const input=useRef<HTMLInputElement>(null);
   const supabase=createClient();
 
@@ -81,7 +81,7 @@ export default function NewAssessmentPage() {
     e.preventDefault();
     if(!make || !model){setMessage("Please select the car make and model.");return;}
     if(!photos.length){setMessage("Please add at least one damage photo.");return;}
-    if(!coords){setMessage("Please allow location access so we can capture your current GPS location.");getCurrentLocation();return;}
+    if(!coords){setMessage("Please allow location access so we can capture your current GPS location.");getCurrentLocation();return;}\n    if(!consent){setMessage("Please confirm the assessment consent before continuing.");return;}
     setBusy(true);
     setMessage("Saving assessment…");
 
@@ -149,7 +149,7 @@ export default function NewAssessmentPage() {
           {photos.length>0&&<div className="photo-list">{photos.map((p,i)=><div key={`${p.name}-${p.size}`}><span>✓</span><strong>{p.name}</strong><small>{(p.size/1024/1024).toFixed(1)} MB</small><button type="button" onClick={()=>removePhoto(i)} aria-label={`Remove ${p.name}`}>Remove</button></div>)}</div>}
           {message&&<div className="form-message" role="status" aria-live="polite">{message}</div>}
         </div>
-        <aside className="assessment-side"><div className="card side-card"><div className="home-kicker">WHAT YOU'LL GET</div><h3>One clear report.</h3><ul><li><b>AI damage summary</b><span>Visible body damage identified from your photos.</span></li><li><b>Repair guidance</b><span>Repair, repaint, blend or replacement recommendations.</span></li><li><b>Cost range</b><span>Preliminary Indian-market body repair estimate.</span></li><li><b>Repair time</b><span>Estimated workshop time for the visible work.</span></li></ul><button className="home-primary-btn" disabled={busy} type="submit" style={{width:"100%",border:0,marginTop:12}}>{busy?"Creating assessment…":"Create assessment →"}</button><small className="muted" style={{display:"block",textAlign:"center",marginTop:12}}>Your photos stay securely in CarFix.</small></div></aside>
+        <aside className="assessment-side"><div className="card side-card"><div className="home-kicker">WHAT YOU'LL GET</div><h3>One clear report.</h3><ul><li><b>AI damage summary</b><span>Visible body damage identified from your photos.</span></li><li><b>Repair guidance</b><span>Repair, repaint, blend or replacement recommendations.</span></li><li><b>Cost range</b><span>Preliminary Indian-market body repair estimate.</span></li><li><b>Repair time</b><span>Estimated workshop time for the visible work.</span></li></ul><button className="home-primary-btn" disabled={busy} type="submit" style={{width:"100%",border:0,marginTop:12}}>{busy?"Creating assessment…":"Create assessment →"}</button><label style={{display:"flex",gap:10,alignItems:"flex-start",marginTop:16,fontSize:14,lineHeight:1.45}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required style={{width:"auto",marginTop:3}}/><span>I confirm I am authorized to upload these vehicle photos and details, and I consent to CarFix processing the submitted photos and location information to provide this assessment.</span></label><small className="muted" style={{display:"block",textAlign:"center",marginTop:12}}>Your photos stay securely in CarFix.</small></div></aside>
       </form>
     </div></section>
   </main>;
