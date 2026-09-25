@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - phase8-support-ux-fix
-  workflow_dispatch:
+  workflow_dispatch:\n\n# Re-triggered after repository Actions were enabled.
 
 jobs:
   build:
