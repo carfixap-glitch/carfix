@@ -99,7 +99,10 @@ function providerError(status: number, payload: OpenAIErrorPayload, requestId?: 
   return new AppError(502, "analysis_failed", "The AI provider could not complete this assessment.", false, requestId);
 }
 
-type OpenAIResult = { raw: string; requestId?: string; providerAttempts: number; latencyMs: number };\n\nasync function callOpenAI(key: string, body: unknown): Promise<OpenAIResult> {\n  const startedAt = Date.now();
+type OpenAIResult = { raw: string; requestId?: string; providerAttempts: number; latencyMs: number };
+
+async function callOpenAI(key: string, body: unknown): Promise<OpenAIResult> {
+  const startedAt = Date.now();
   const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let response: Response;
@@ -142,7 +145,9 @@ Deno.serve(async (req: Request) => {
   let assessmentId = "";
   let userId = "";
   let lockAcquired = false;
-  let db: ReturnType<typeof createClient> | null = null;\n  let analysisAttemptId = "";\n  let analysisStartedAt = 0;\n  let analysisAttemptId = "";\n  let analysisStartedAt = 0;
+  let db: ReturnType<typeof createClient> | null = null;
+  let analysisAttemptId = "";
+  let analysisStartedAt = 0;
 
   try {
     const auth = req.headers.get("Authorization");
@@ -283,7 +288,9 @@ Vehicle: Make: ${vehicle?.make || "unknown"} Model: ${vehicle?.model || "unknown
       text: { format: { type: "json_object" } },
     });
 
-    const rawResponse = openAIResult.raw;\n\n    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+    const rawResponse = openAIResult.raw;
+
+    let responsePayload: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
     try {
       responsePayload = JSON.parse(rawResponse);
     } catch {
