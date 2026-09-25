@@ -51,7 +51,7 @@ export default function NewAssessmentPage() {
         const next={latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy};
         setCoords(next);
         setLocationStatus(`GPS location captured (accuracy ~${Math.round(next.accuracy)} m). Looking up address…`);
-        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${next.latitude}&longitude=${next.longitude}&localityLanguage=en`)
+        fetch(`/api/reverse-geocode?latitude=${encodeURIComponent(next.latitude)}&longitude=${encodeURIComponent(next.longitude)}`)
           .then(response=>{if(!response.ok){console.warn("CarFix reverse geocode failed",{status:response.status,statusText:response.statusText});throw new Error(`Reverse geocoding failed (${response.status})`);}return response.json();})
           .then(data=>{
             const details={
